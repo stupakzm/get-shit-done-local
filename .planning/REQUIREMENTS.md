@@ -23,8 +23,8 @@
 
 ### Hardware Suggestions
 
-- [ ] **HW-01**: When user explicitly requests hardware detection, system detects available VRAM and RAM
-- [ ] **HW-02**: System suggests which installed models are feasible for each role based on detected hardware
+- [x] **HW-01**: When user explicitly requests hardware detection, system detects available VRAM and RAM
+- [x] **HW-02**: System suggests which installed models are feasible for each role based on detected hardware
 
 ## v2 Requirements
 
@@ -66,8 +66,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | CMD-02 | Phase 2 | Complete |
 | CMD-03 | Phase 2 | Complete |
 | CMD-04 | Phase 2 | Complete |
-| HW-01 | Phase 3 | Pending |
-| HW-02 | Phase 3 | Pending |
+| HW-01 | Phase 3 | Complete |
+| HW-02 | Phase 3 | Complete |
 
 **Coverage:**
 - v1 requirements: 12 total
