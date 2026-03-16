@@ -13,7 +13,7 @@ This roadmap delivers Ollama local LLM support for GSD in three phases. Phase 1 
 Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Execution Foundation** - Subprocess wrapper, config extension, prompt adapter, and output parsing — all the plumbing required before any model can be invoked (completed 2026-03-16)
-- [ ] **Phase 2: Routing and Assignment** - Workflow routing patch and `/gsd:set-model` command — users can assign local models and GSD routes to them
+- [x] **Phase 2: Routing and Assignment** - Workflow routing patch and `/gsd:set-model` command — users can assign local models and GSD routes to them (completed 2026-03-16)
 - [ ] **Phase 3: Hardware Suggestions** - VRAM/RAM detection and model feasibility warnings in the assignment UX
 
 ## Phase Details
@@ -65,5 +65,5 @@ Phases execute in numeric order: 1 → 2 → 3
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Execution Foundation | 3/3 | Complete    | 2026-03-16 |
-| 2. Routing and Assignment | 2/4 | In Progress|  |
+| 2. Routing and Assignment | 4/4 | Complete    | 2026-03-16 |
 | 3. Hardware Suggestions | 0/TBD | Not started | - |

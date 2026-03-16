@@ -3,15 +3,15 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 02-routing-and-assignment/02-02-PLAN.md
-last_updated: "2026-03-16T19:43:19.472Z"
-last_activity: 2026-03-15 — Roadmap created
+stopped_at: Completed 02-routing-and-assignment/02-04-PLAN.md
+last_updated: "2026-03-16T20:04:20.000Z"
+last_activity: 2026-03-16 — Completed 02-04 ollama routing guards
 progress:
   total_phases: 3
   completed_phases: 1
   total_plans: 7
-  completed_plans: 5
-  percent: 0
+  completed_plans: 7
+  percent: 71
 ---
 
 # Project State
@@ -30,7 +30,7 @@ Plan: 0 of TBD in current phase
 Status: Ready to plan
 Last activity: 2026-03-15 — Roadmap created
 
-Progress: [░░░░░░░░░░] 0%
+Progress: [███████░░░] 71%
 
 ## Performance Metrics
 
@@ -52,7 +52,8 @@ Progress: [░░░░░░░░░░] 0%
 *Updated after each plan completion*
 | Phase 01 P01 | 4 | 1 tasks | 1 files |
 | Phase 02-routing-and-assignment P02-01 | 10 | 1 tasks | 1 files |
-| Phase 02-routing-and-assignment P02 | 4min | 2 tasks | 3 files |
+| Phase 02-routing-and-assignment P02-02 | 4min | 2 tasks | 3 files |
+| Phase 02-routing-and-assignment P02-04 | 16min | 2 tasks | 9 files |
 
 ## Accumulated Context
 
@@ -68,6 +69,7 @@ Recent decisions affecting current work:
 - [Phase 02-routing-and-assignment]: Test 5 (CMD-03 config-get model_overrides) correctly passes RED — tests existing infrastructure, not the missing command
 - [Phase 02-routing-and-assignment]: Array-arg form of runGsdTools avoids shell quoting issues with colon-containing values like ollama:qwen2.5:7b
 - [Phase 02-routing-and-assignment]: Test CMD-04 used --raw expecting JSON; removed flag since output() convention is raw=false -> JSON, raw=true -> human text
+- [Phase 02-routing-and-assignment 02-04]: ollama: guard uses bash glob [[ model == ollama:* ]] — reliable without regex; model name stripped with ${model#ollama:} parameter expansion
 
 ### Pending Todos
 
@@ -81,6 +83,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T19:43:19.469Z
-Stopped at: Completed 02-routing-and-assignment/02-02-PLAN.md
+Last session: 2026-03-16T20:04:20.000Z
+Stopped at: Completed 02-routing-and-assignment/02-04-PLAN.md
 Resume file: None
