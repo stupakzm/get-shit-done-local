@@ -226,6 +226,7 @@ These settings apply to future /gsd:plan-phase and /gsd:execute-phase runs.
 
 Quick commands:
 - /gsd:set-profile <profile> — switch model profile
+- /gsd:set-model — assign a model to a specific GSD role
 - /gsd:plan-phase --research — force research
 - /gsd:plan-phase --skip-research — skip research
 - /gsd:plan-phase --skip-verify — skip plan check
