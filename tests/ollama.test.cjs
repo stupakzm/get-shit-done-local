@@ -52,14 +52,14 @@ function createMockBin(dir, script) {
  * @param {string} mockBinDir
  * @returns {{ success: boolean, output: string, error?: string }}
  */
-function runGsdToolsWithMockBin(args, cwd, mockBinDir) {
+function runGsdToolsWithMockBin(args, cwd, mockBinDir, envOverrides = {}) {
   const customPath = mockBinDir + path.delimiter + process.env.PATH;
   try {
     const result = execFileSync(process.execPath, [TOOLS_PATH, ...args], {
       cwd,
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, PATH: customPath },
+      env: { ...process.env, PATH: customPath, ...envOverrides },
     });
     return { success: true, output: result.trim() };
   } catch (err) {
@@ -132,10 +132,14 @@ describe('EXEC-01: ollama list', () => {
   });
 
   test('EXEC-01: list error — binary missing: output contains "not found" and "ollama.com"', () => {
-    // Run WITHOUT mock bin — no ollama binary on PATH (use a path with no ollama)
+    // Strip ollama from PATH entirely: set PATH to only an empty dir
+    // Also override LOCALAPPDATA so the Windows fallback path doesn't resolve
     const emptyBinDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-empty-bin-'));
     try {
-      const result = runGsdToolsWithMockBin(['ollama', 'list'], tmpDir, emptyBinDir);
+      const result = runGsdToolsWithMockBin(['ollama', 'list'], tmpDir, emptyBinDir, {
+        PATH: emptyBinDir,
+        LOCALAPPDATA: emptyBinDir,
+      });
 
       assert.ok(!result.success, 'Expected failure when binary is missing');
       const combinedOutput = (result.output + ' ' + (result.error || '')).toLowerCase();
