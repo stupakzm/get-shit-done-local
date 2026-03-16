@@ -292,3 +292,117 @@ describe('EXEC-05: ollama run — model not installed', () => {
     assert.ok(combinedOutput.includes('ollama pull'), 'output should contain "ollama pull"');
   });
 });
+
+// ─── Mock nvidia-smi helper ────────────────────────────────────────────────────
+
+/**
+ * Create a mock `nvidia-smi` binary (or .cmd on Windows) in a `mock-bin` subdirectory
+ * of the given directory. The mock outputs vramMb on stdout and exits 0.
+ *
+ * @param {string} dir    - Parent directory under which to create mock-bin/
+ * @param {string} vramMb - Value(s) to echo as stdout (e.g. "6144" or "6144\n2048")
+ * @returns {string} binDir - Directory containing the mock nvidia-smi binary
+ */
+function createMockNvidiaSmi(dir, vramMb) {
+  const binDir = path.join(dir, 'mock-bin');
+  fs.mkdirSync(binDir, { recursive: true });
+
+  if (process.platform === 'win32') {
+    // Windows: .cmd file — echo each line of vramMb value
+    const lines = String(vramMb).split('\n');
+    const echoLines = lines.map(l => `@echo ${l}`).join('\r\n');
+    fs.writeFileSync(path.join(binDir, 'nvidia-smi.cmd'), `${echoLines}\r\n@exit /b 0`);
+  } else {
+    // Unix: executable shell script
+    const p = path.join(binDir, 'nvidia-smi');
+    fs.writeFileSync(p, `#!/bin/sh\nprintf '%s\\n' ${JSON.stringify(String(vramMb))}\nexit 0`);
+    fs.chmodSync(p, 0o755);
+  }
+
+  return binDir;
+}
+
+// ─── HW-01: ollama hw-detect ───────────────────────────────────────────────────
+
+describe('HW-01: ollama hw-detect', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('HW-01-a: hw-detect with nvidia-smi success — JSON has vram.available true, mb 6144, gb 6.0, source nvidia-smi; ram.gb is positive', () => {
+    const mockNvidiaBinDir = createMockNvidiaSmi(tmpDir, '6144');
+
+    const result = runGsdToolsWithMockBin(['ollama', 'hw-detect'], tmpDir, mockNvidiaBinDir);
+
+    assert.ok(result.success, `Expected success but got: ${result.error || result.output}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.vram.available, true, 'vram.available should be true');
+    assert.strictEqual(parsed.vram.mb, 6144, 'vram.mb should be 6144');
+    assert.strictEqual(parsed.vram.gb, 6.0, 'vram.gb should be 6.0');
+    assert.strictEqual(parsed.vram.source, 'nvidia-smi', 'vram.source should be nvidia-smi');
+    assert.ok(typeof parsed.ram.gb === 'number' && parsed.ram.gb > 0, 'ram.gb should be a positive number');
+  });
+
+  test('HW-01-b: hw-detect with nvidia-smi absent — command exits 0 (non-fatal), vram.available false, ram.available true', () => {
+    // Create an empty bin dir with no nvidia-smi inside
+    const emptyBinDir = fs.mkdtempSync(path.join(os.tmpdir(), 'gsd-empty-nvidia-'));
+    try {
+      const result = runGsdToolsWithMockBin(['ollama', 'hw-detect'], tmpDir, emptyBinDir, {
+        PATH: emptyBinDir,
+      });
+
+      assert.ok(result.success === true, `Expected success (non-fatal) but command failed: ${result.error || result.output}`);
+
+      const parsed = JSON.parse(result.output);
+      assert.strictEqual(parsed.vram.available, false, 'vram.available should be false when nvidia-smi absent');
+      assert.strictEqual(parsed.ram.available, true, 'ram.available should be true');
+    } finally {
+      fs.rmSync(emptyBinDir, { recursive: true, force: true });
+    }
+  });
+
+  test('HW-01-c: hw-detect with multi-GPU nvidia-smi output — vram.mb equals max (6144), not sum or first-only', () => {
+    // Mock nvidia-smi that returns two GPU lines
+    const mockNvidiaBinDir = createMockNvidiaSmi(tmpDir, '6144\n2048');
+
+    const result = runGsdToolsWithMockBin(['ollama', 'hw-detect'], tmpDir, mockNvidiaBinDir);
+
+    assert.ok(result.success, `Expected success but got: ${result.error || result.output}`);
+
+    const parsed = JSON.parse(result.output);
+    assert.strictEqual(parsed.vram.mb, 6144, 'vram.mb should be the maximum GPU value (6144), not 2048 or 8192');
+  });
+});
+
+// ─── HW-02: parseSizeGb helper ─────────────────────────────────────────────────
+
+describe('HW-02: parseSizeGb helper', () => {
+  // parseSizeGb is not yet exported — requiring it here causes RED failure as expected
+  const { parseSizeGb } = require('../get-shit-done/bin/lib/ollama.cjs');
+
+  test('HW-02-a: parseSizeGb("4.7 GB") returns 4.7', () => {
+    assert.strictEqual(parseSizeGb('4.7 GB'), 4.7);
+  });
+
+  test('HW-02-b: parseSizeGb("2.0 GB") returns 2.0', () => {
+    assert.strictEqual(parseSizeGb('2.0 GB'), 2.0);
+  });
+
+  test('HW-02-c: parseSizeGb("800 MB") returns approximately 0.78 (800/1024, within 0.01 tolerance)', () => {
+    assert.ok(
+      Math.abs(parseSizeGb('800 MB') - (800 / 1024)) < 0.01,
+      'MB conversion within 0.01 GB'
+    );
+  });
+
+  test('HW-02-d: parseSizeGb("unknown") returns null', () => {
+    assert.strictEqual(parseSizeGb('unknown'), null);
+  });
+});
