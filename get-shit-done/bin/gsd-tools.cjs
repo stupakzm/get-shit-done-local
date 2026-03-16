@@ -383,6 +383,11 @@ async function main() {
       break;
     }
 
+    case 'config-set-model-override': {
+      config.cmdConfigSetModelOverride(cwd, args[1], args[2], raw);
+      break;
+    }
+
     case 'config-get': {
       config.cmdConfigGet(cwd, args[1], raw);
       break;
