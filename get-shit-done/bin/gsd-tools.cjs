@@ -621,8 +621,10 @@ async function main() {
           prompt = fs.readFileSync(0, 'utf-8');
         }
         ollama.cmdOllamaRun(cwd, modelName, prompt, raw);
+      } else if (subcommand === 'hw-detect') {
+        ollama.cmdHwDetect(cwd, raw);
       } else {
-        error(`Unknown ollama subcommand: ${subcommand}. Valid: list, run`);
+        error(`Unknown ollama subcommand: ${subcommand}. Valid: list, run, hw-detect`);
       }
       break;
     }

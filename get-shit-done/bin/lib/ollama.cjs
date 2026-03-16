@@ -256,6 +256,98 @@ function cmdOllamaRun(cwd, modelName, prompt, raw) {
   child.stdin.end();
 }
 
+// ─── parseSizeGb ──────────────────────────────────────────────────────────────
+
+/**
+ * Parse a size string in Ollama list format (e.g. "4.7 GB", "800 MB") to GB.
+ *
+ * @param {string} sizeStr
+ * @returns {number|null} Size in GB, or null if unparseable
+ */
+function parseSizeGb(sizeStr) {
+  const match = /^([\d.]+)\s*(GB|MB)/i.exec(sizeStr);
+  if (!match) return null;
+  const val = parseFloat(match[1]);
+  const unit = match[2].toUpperCase();
+  return unit === 'GB' ? val : val / 1024;
+}
+
+// ─── cmdHwDetect ──────────────────────────────────────────────────────────────
+
+/**
+ * Detect local hardware (VRAM via nvidia-smi or WMI, RAM via os.totalmem).
+ * Never calls error() — always returns a structured result via output().
+ *
+ * JSON output: { vram: { available, mb, gb, source, note? }, ram: { available, bytes, gb } }
+ * Raw output:  "RAM: X GB\nVRAM: Y GB (source)" or "VRAM: unavailable (...)"
+ *
+ * @param {string} cwd
+ * @param {boolean} raw
+ */
+function cmdHwDetect(cwd, raw) {
+  const result = {
+    vram: { available: false, mb: null, gb: null, source: null },
+    ram: { available: true, bytes: os.totalmem(), gb: 0 },
+  };
+  result.ram.gb = parseFloat((result.ram.bytes / (1024 ** 3)).toFixed(1));
+
+  // Helper: try PowerShell WMI fallback for VRAM detection
+  function tryWmiFallback() {
+    try {
+      const psOut = execSync(
+        'powershell -NoProfile -Command "(Get-CimInstance Win32_VideoController | Where-Object {$_.CurrentHorizontalResolution -gt 0} | Select-Object -First 1).AdapterRAM"',
+        { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' }
+      );
+      const bytes = parseInt(psOut.trim(), 10);
+      if (!isNaN(bytes) && bytes > 0) {
+        const mb = Math.round(bytes / (1024 * 1024));
+        result.vram = {
+          available: true,
+          mb,
+          gb: parseFloat((mb / 1024).toFixed(1)),
+          source: 'wmi',
+          note: 'limited to 4GB for GPUs with more VRAM',
+        };
+      }
+    } catch (_) {
+      // WMI failed — vram.available stays false
+    }
+  }
+
+  // Try nvidia-smi first
+  try {
+    const smiOut = execSync(
+      'nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits',
+      { encoding: 'utf-8', timeout: 5000, stdio: 'pipe' }
+    );
+    const lines = smiOut
+      .trim()
+      .split('\n')
+      .map(l => parseInt(l.trim(), 10))
+      .filter(n => !isNaN(n));
+    if (lines.length > 0) {
+      const mb = Math.max(...lines);
+      result.vram = {
+        available: true,
+        mb,
+        gb: parseFloat((mb / 1024).toFixed(1)),
+        source: 'nvidia-smi',
+      };
+    }
+  } catch (nvErr) {
+    // nvidia-smi absent or failed — try WMI fallback either way
+    tryWmiFallback();
+  }
+
+  const rawLines = [
+    `RAM: ${result.ram.gb} GB`,
+    result.vram.available
+      ? `VRAM: ${result.vram.gb} GB (${result.vram.source})`
+      : 'VRAM: unavailable (no supported GPU detection tool found)',
+  ];
+  output(result, raw, rawLines.join('\n'));
+}
+
 // ─── Exports ──────────────────────────────────────────────────────────────────
 
-module.exports = { cmdOllamaList, cmdOllamaRun };
+module.exports = { cmdOllamaList, cmdOllamaRun, cmdHwDetect, parseSizeGb };
