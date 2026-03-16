@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-hardware-suggestions/03-01-PLAN.md
-last_updated: "2026-03-16T21:39:09.822Z"
+stopped_at: Completed 03-hardware-suggestions/03-02-PLAN.md
+last_updated: "2026-03-16T21:44:55.577Z"
 last_activity: 2026-03-15 — Roadmap created
 progress:
   total_phases: 3
   completed_phases: 2
   total_plans: 10
-  completed_plans: 8
+  completed_plans: 9
   percent: 100
 ---
 
@@ -72,6 +72,7 @@ Progress: [███████░░░] 71%
 | Phase 02-routing-and-assignment P02-04 | 16min | 2 tasks | 9 files |
 | Phase 02-routing-and-assignment P03 | 30min | 2 tasks | 3 files |
 | Phase 03-hardware-suggestions P03-01 | 3min | 2 tasks | 1 files |
+| Phase 03-hardware-suggestions P03-02 | 2min | 2 tasks | 2 files |
 
 ## Accumulated Context
 
@@ -91,6 +92,8 @@ Recent decisions affecting current work:
 - [Phase 02-routing-and-assignment]: No-args invocation of /gsd:set-model acts as view-only mode — shows table and exits without picker loop
 - [Phase 03-hardware-suggestions]: HW-01-c multi-GPU test contracts max-value heuristic for Wave 2 implementation
 - [Phase 03-hardware-suggestions]: createMockNvidiaSmi uses printf on Unix for multi-line GPU output; multi-@echo on Windows
+- [Phase 03-hardware-suggestions]: WMI fallback consolidated into tryWmiFallback() closure — any nvidia-smi failure (not just ENOENT) triggers WMI, removes code duplication
+- [Phase 03-hardware-suggestions]: parseSizeGb uses case-insensitive GB/MB regex; null for non-matching strings
 
 ### Pending Todos
 
@@ -104,6 +107,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T21:39:09.818Z
-Stopped at: Completed 03-hardware-suggestions/03-01-PLAN.md
+Last session: 2026-03-16T21:44:55.573Z
+Stopped at: Completed 03-hardware-suggestions/03-02-PLAN.md
 Resume file: None
