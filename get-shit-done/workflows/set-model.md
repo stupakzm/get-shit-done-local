@@ -116,17 +116,20 @@ Initialize `hwInfo = null` (will be set by hardware detection below).
 Ask this question immediately when entering the loop. Do NOT skip it. Do NOT proceed to role
 selection without asking it first.
 
+Print as plain text:
 ```
-AskUserQuestion(
-  question="Run hardware detection? Detects VRAM/RAM so model picker can show which local models fit in VRAM.",
-  options=[
-    "Yes — detect hardware",
-    "No / Skip"
-  ]
-)
+Hardware detection — detect VRAM/RAM so the model picker can show which local models fit?
+
+  1. Yes
+  2. No / Skip
 ```
 
-If user selects "Yes":
+Then call (no options array — user types a number or word):
+```
+AskUserQuestion(question="Enter 1 or 2 (or yes/no):")
+```
+
+If user enters 1 or "yes":
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
 ```
@@ -144,7 +147,7 @@ Hardware detected:
 If vram.available is false: show `VRAM: unavailable`.
 If command fails: set `hwInfo = null`, show `Hardware detection failed — no labels will be shown`.
 
-If user selects "No / Skip": `hwInfo` stays null.
+If user enters 2 or "no" or "skip": `hwInfo` stays null.
 
 ---
 
@@ -275,15 +278,19 @@ Verifier: ollama:llama3.2:3b → profile default
 
 **3f. Continue prompt**
 
+Print as plain text:
 ```
-AskUserQuestion(
-  question="Assign another role?",
-  options=["Yes", "No"]
-)
+  1. Assign another role
+  0. Done / Exit
 ```
 
-If "Yes" → go back to step 3a.
-If "No" → break loop.
+Then call:
+```
+AskUserQuestion(question="Enter 1 to continue or 0 to exit:")
+```
+
+If user enters 1 → go back to step 3a (skip hardware detection, keep existing hwInfo).
+If user enters 0 or "done" or "exit" → break loop.
 </step>
 
 <step name="done">
