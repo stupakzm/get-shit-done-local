@@ -150,32 +150,34 @@ If user selects "No / Skip": `hwInfo` stays null.
 
 **3a. Role selection**
 
-Show ALL 12 roles — never omit, never group, never abbreviate:
+Output this exact block as plain text (do NOT use AskUserQuestion for the list — just print it):
 
 ```
-AskUserQuestion(
-  question="Which role would you like to configure?",
-  options=[
-    "1. Planner",
-    "2. Roadmapper",
-    "3. Executor",
-    "4. Phase Researcher",
-    "5. Project Researcher",
-    "6. Research Synthesizer",
-    "7. Debugger",
-    "8. Codebase Mapper",
-    "9. Verifier",
-    "10. Plan Checker",
-    "11. Integration Checker",
-    "12. Nyquist Auditor",
-    "0. Exit"
-  ]
-)
+Which role to configure?
+
+  1.  Planner
+  2.  Roadmapper
+  3.  Executor
+  4.  Phase Researcher
+  5.  Project Researcher
+  6.  Research Synthesizer
+  7.  Debugger
+  8.  Codebase Mapper
+  9.  Verifier
+  10. Plan Checker
+  11. Integration Checker
+  12. Nyquist Auditor
+  0.  Exit
 ```
 
-If user picks 0 → break loop.
+Then call:
+```
+AskUserQuestion(question="Enter number (0–12):")
+```
 
-Resolve the selected friendly name back to an `agentKey` using the ROLE_FRIENDLY_NAMES mapping above.
+If user enters 0 or "exit" → break loop.
+
+Map the number to agentKey using ROLE_FRIENDLY_NAMES above (1=gsd-planner, 2=gsd-roadmapper, etc.).
 
 **3b. Model selection**
 
@@ -185,56 +187,57 @@ profileDefault = MODEL_PROFILES[agentKey][config.model_profile]
 ```
 (e.g., for gsd-executor on balanced profile: profileDefault = "sonnet")
 
-Build the picker options:
+Build the list as plain text output (do NOT use AskUserQuestion for the list — just print it):
 
-**Ollama models (options 1..N):**
-Use ALL models from `ollamaModels` — no filtering. For each:
-- Format: `N. {model.name} ({model.size})`
-- If `hwInfo` is set AND `hwInfo.vram.available` is true:
+For each Ollama model (1..N), format the line as:
+  `  N. {model.name} ({model.size}) {label}`
+
+Where label:
+- If hwInfo set AND hwInfo.vram.available:
   - Parse size to GB (match `/^([\d.]+)\s*(GB|MB)/i`; MB ÷ 1024)
-  - modelSizeGb <= hwInfo.vram.gb → append ` [fits in VRAM]`
-  - modelSizeGb > hwInfo.vram.gb → append ` [exceeds VRAM — will CPU-offload at 1-3 tok/s]`
-  - **EXACT strings only. WRONG: "light, fast", "mid", "fits", or any variation.**
-- If hwInfo is null or vram.available is false: no annotation.
+  - size <= hwInfo.vram.gb → `[fits in VRAM]`
+  - size > hwInfo.vram.gb → `[exceeds VRAM — will CPU-offload at 1-3 tok/s]`
+  - **EXACT strings. WRONG: "light, fast", "mid", or any variation.**
+- Otherwise: no label
 
-**After Ollama models, add cloud options:**
-- `sonnet`
-- `haiku`
-- `inherit`
-
-**After cloud options:**
-- `Type custom model name`
-
-**Always last, as option 0:**
-- `0. Back to profile default (currently: {profileDefault})`
-
-Example with 5 local models, hwInfo.vram.gb = 6.0:
+After Ollama models append:
 ```
-AskUserQuestion(
-  question="Select model for Executor:",
-  options=[
-    "1. qwen2.5-coder:32b (19 GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]",
-    "2. qwen2.5-coder:14b (9.0 GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]",
-    "3. qwen2.5-coder:7b (4.7 GB) [fits in VRAM]",
-    "4. llama3.2:latest (2.0 GB) [fits in VRAM]",
-    "5. qwen2.5:7b-instruct-q4_K_M (4.7 GB) [fits in VRAM]",
-    "6. sonnet",
-    "7. haiku",
-    "8. inherit",
-    "9. Type custom model name",
-    "0. Back to profile default (currently: sonnet)"
-  ]
-)
+  {N+1}. sonnet
+  {N+2}. haiku
+  {N+3}. inherit
+  {N+4}. Type custom model name
+  0.    Back to profile default (currently: {profileDefault})
+```
+
+Example output for Executor (5 local models, 6 GB VRAM):
+```
+Select model for Executor:
+
+  1. qwen2.5-coder:32b (19 GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]
+  2. qwen2.5-coder:14b (9.0 GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]
+  3. qwen2.5-coder:7b (4.7 GB) [fits in VRAM]
+  4. llama3.2:latest (2.0 GB) [fits in VRAM]
+  5. qwen2.5:7b-instruct-q4_K_M (4.7 GB) [fits in VRAM]
+  6. sonnet
+  7. haiku
+  8. inherit
+  9. Type custom model name
+  0. Back to profile default (currently: sonnet)
+```
+
+Then call:
+```
+AskUserQuestion(question="Enter number:")
 ```
 
 **3c. Determine value to write**
 
-- If user picked an Ollama model (options 1..N) → value = `ollama:{model.name}` (e.g. `ollama:qwen2.5-coder:7b`)
-- If user picked `sonnet`, `haiku`, or `inherit` → value = that string as-is
-- If user picked "Type custom model name":
-  - Prompt: `Enter model name (e.g. ollama:qwen2.5-coder:32b or sonnet):`
-  - value = whatever the user typed, verbatim. Do NOT add any prefix automatically.
-- If user picked 0 "Back to profile default" → value = `reset`
+- User entered 1..N (Ollama model) → value = `ollama:{model.name}`
+- User entered number for sonnet/haiku/inherit → value = that string as-is
+- User entered number for "Type custom model name":
+  - Call: `AskUserQuestion(question="Enter model name (e.g. ollama:qwen2.5-coder:32b or sonnet):")`
+  - value = typed string verbatim. No auto-prefix.
+- User entered 0 → value = `reset`
 
 **3d. Write the assignment**
 
