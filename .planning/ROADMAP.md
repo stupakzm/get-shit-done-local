@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Execution Foundation** - Subprocess wrapper, config extension, prompt adapter, and output parsing — all the plumbing required before any model can be invoked (completed 2026-03-16)
 - [x] **Phase 2: Routing and Assignment** - Workflow routing patch and `/gsd:set-model` command — users can assign local models and GSD routes to them (completed 2026-03-16)
-- [ ] **Phase 3: Hardware Suggestions** - VRAM/RAM detection and model feasibility warnings in the assignment UX
+- [x] **Phase 3: Hardware Suggestions** - VRAM/RAM detection and model feasibility warnings in the assignment UX (completed 2026-03-16)
 
 ## Phase Details
 
@@ -58,9 +58,9 @@ Plans:
 **Plans**: 3 plans
 
 Plans:
-- [ ] 03-01-PLAN.md — Add HW-01 and HW-02 failing test stubs to ollama.test.cjs (Wave 1, TDD RED)
-- [ ] 03-02-PLAN.md — Implement cmdHwDetect and parseSizeGb in ollama.cjs, wire ollama hw-detect (Wave 2)
-- [ ] 03-03-PLAN.md — Patch set-model.md with hardware detection step and feasibility annotations (Wave 3)
+- [x] 03-01-PLAN.md — Add HW-01 and HW-02 failing test stubs to ollama.test.cjs (Wave 1, TDD RED)
+- [x] 03-02-PLAN.md — Implement cmdHwDetect and parseSizeGb in ollama.cjs, wire ollama hw-detect (Wave 2)
+- [x] 03-03-PLAN.md — Patch set-model.md with hardware detection step and feasibility annotations (Wave 3)
 
 ## Progress
 
@@ -71,4 +71,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Execution Foundation | 3/3 | Complete    | 2026-03-16 |
 | 2. Routing and Assignment | 4/4 | Complete   | 2026-03-16 |
-| 3. Hardware Suggestions | 2/3 | In Progress|  |
+| 3. Hardware Suggestions | 3/3 | Complete   | 2026-03-16 |

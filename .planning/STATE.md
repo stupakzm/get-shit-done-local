@@ -3,14 +3,14 @@ gsd_state_version: 1.0
 milestone: v1.0
 milestone_name: milestone
 status: planning
-stopped_at: Completed 03-hardware-suggestions/03-02-PLAN.md
-last_updated: "2026-03-16T21:44:55.577Z"
+stopped_at: Completed 03-hardware-suggestions/03-03-PLAN.md
+last_updated: "2026-03-16T22:17:49.880Z"
 last_activity: 2026-03-15 — Roadmap created
 progress:
   total_phases: 3
-  completed_phases: 2
+  completed_phases: 3
   total_plans: 10
-  completed_plans: 9
+  completed_plans: 10
   percent: 100
 ---
 
@@ -73,6 +73,7 @@ Progress: [███████░░░] 71%
 | Phase 02-routing-and-assignment P03 | 30min | 2 tasks | 3 files |
 | Phase 03-hardware-suggestions P03-01 | 3min | 2 tasks | 1 files |
 | Phase 03-hardware-suggestions P03-02 | 2min | 2 tasks | 2 files |
+| Phase 03-hardware-suggestions P03 | 25min | 2 tasks | 1 files |
 
 ## Accumulated Context
 
@@ -94,6 +95,9 @@ Recent decisions affecting current work:
 - [Phase 03-hardware-suggestions]: createMockNvidiaSmi uses printf on Unix for multi-line GPU output; multi-@echo on Windows
 - [Phase 03-hardware-suggestions]: WMI fallback consolidated into tryWmiFallback() closure — any nvidia-smi failure (not just ENOENT) triggers WMI, removes code duplication
 - [Phase 03-hardware-suggestions]: parseSizeGb uses case-insensitive GB/MB regex; null for non-matching strings
+- [Phase 03-hardware-suggestions]: AskUserQuestion required for detect_hardware — prose descriptions are skippable, structured questions are not
+- [Phase 03-hardware-suggestions]: ollama list (no --raw) returns JSON with result.models array; --raw returns plain text
+- [Phase 03-hardware-suggestions]: Custom model name written as-is — no ollama: prefix added automatically by set-model workflow
 
 ### Pending Todos
 
@@ -107,6 +111,6 @@ None yet.
 
 ## Session Continuity
 
-Last session: 2026-03-16T21:44:55.573Z
-Stopped at: Completed 03-hardware-suggestions/03-02-PLAN.md
+Last session: 2026-03-16T22:17:49.877Z
+Stopped at: Completed 03-hardware-suggestions/03-03-PLAN.md
 Resume file: None
