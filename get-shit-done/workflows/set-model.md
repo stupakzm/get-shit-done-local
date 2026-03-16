@@ -98,6 +98,40 @@ Skip the role_picker_loop entirely.
 Otherwise, continue to the role_picker_loop.
 </step>
 
+<step name="detect_hardware">
+Before entering the role picker, offer the user the option to run hardware detection.
+
+Ask:
+```
+Would you like to run hardware detection? This shows how much VRAM and RAM your system
+has, so the model picker can flag which models will fit in VRAM.
+Options: [Yes] [No / Skip]
+```
+
+If user selects Yes:
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
+```
+Parse the JSON output into `hwInfo`. The shape is:
+```json
+{ "vram": { "available": true/false, "mb": N, "gb": N, "source": "nvidia-smi" },
+  "ram":  { "available": true, "bytes": N, "gb": N } }
+```
+Display the detected hardware:
+```
+Hardware detected:
+  RAM:  {hwInfo.ram.gb} GB
+  VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})   [if vram.available]
+  VRAM: unavailable (no supported GPU detection tool found)  [if !vram.available]
+```
+If the command fails for any reason, set `hwInfo = null` and display:
+```
+Hardware detection failed — model picker will proceed without feasibility labels.
+```
+
+If user selects No / Skip: set `hwInfo = null`. Proceed to role_picker_loop.
+</step>
+
 <step name="role_picker_loop">
 This is the main assignment loop. Repeat until user selects Exit or says No to "Assign another role?".
 
@@ -136,6 +170,12 @@ Build the model list dynamically. Number the options sequentially starting from 
 - Lines 1..N: `N. <model-name> (<size>)` for each Ollama model from the ollama list result
   - Use the `name` field exactly as returned (e.g. `qwen2.5:7b`)
   - Include size in parentheses (e.g. `4.7GB`)
+  - If `hwInfo` is set and `hwInfo.vram.available` is true:
+    - Parse the model size to GB: match `/^([\d.]+)\s*(GB|MB)/i`; GB units are direct, MB units divide by 1024
+    - If modelSizeGb > hwInfo.vram.gb → append ` [exceeds VRAM — will CPU-offload at 1-3 tok/s]`
+    - If modelSizeGb <= hwInfo.vram.gb → append ` [fits in VRAM]`
+  - If `hwInfo` is null or `hwInfo.vram.available` is false: no annotation on any model.
+  - Cloud models (sonnet, haiku, inherit): never annotated regardless of hwInfo.
 - After Ollama models, add the fixed cloud options in this order:
   - `sonnet`
   - `haiku`
@@ -233,4 +273,6 @@ No changes made.
 - [ ] One-line diff displayed after each assignment
 - [ ] "Assign another role?" loop continues until user says No or picks Exit
 - [ ] Assignment persists in .planning/config.json as model_overrides entry
+- [ ] User is offered hardware detection option before the role picker loop
+- [ ] Ollama models in picker show feasibility labels when hwInfo.vram.available is true
 </success_criteria>
