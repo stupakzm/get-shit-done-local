@@ -91,67 +91,66 @@ If Ollama was unavailable, append a note below the table:
 </step>
 
 <step name="check_view_only">
-If the workflow was invoked with no positional arguments (no role name specified after `/gsd:set-model`),
-treat this as view-only mode: display the table and exit with the message:
+If the workflow was invoked with no positional arguments AND no `--assign` flag, treat this as
+view-only mode: display the table and exit with the message:
 
 ```
-Run /gsd:set-model <role> or /gsd:set-model --assign to configure a role assignment.
+Run /gsd:set-model --assign to configure a role assignment.
 ```
 
 Skip the role_picker_loop entirely.
 
-Otherwise, continue to the role_picker_loop.
-</step>
-
-<step name="detect_hardware">
-**MANDATORY: This step MUST execute before role_picker_loop. Do not skip it.**
-
-Use AskUserQuestion to present the hardware detection option. This is a required interactive step:
-
-```
-AskUserQuestion(
-  question="Would you like to run hardware detection before selecting models? This detects your VRAM and RAM so the model picker can show which models will fit in VRAM.",
-  options=[
-    "1. Yes — detect hardware now",
-    "2. No / Skip — proceed without feasibility labels"
-  ]
-)
-```
-
-If user selects 1 (Yes):
-```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
-```
-Parse the JSON output into `hwInfo`. The shape is:
-```json
-{ "vram": { "available": true/false, "mb": N, "gb": N, "source": "nvidia-smi" },
-  "ram":  { "available": true, "bytes": N, "gb": N } }
-```
-Display the detected hardware:
-```
-Hardware detected:
-  RAM:  {hwInfo.ram.gb} GB
-  VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})   [if vram.available]
-  VRAM: unavailable (no supported GPU detection tool found)  [if !vram.available]
-```
-If the command fails for any reason, set `hwInfo = null` and display:
-```
-Hardware detection failed — model picker will proceed without feasibility labels.
-```
-
-If user selects 2 (No / Skip): set `hwInfo = null`.
-
-After this step completes (either path), proceed immediately to role_picker_loop.
+If `--assign` was passed (or any role name was specified), continue to the role_picker_loop.
 </step>
 
 <step name="role_picker_loop">
 This is the main assignment loop. Repeat until user selects Exit or says No to "Assign another role?".
 
 Track whether any changes were made (start with `changesMade = false`).
+Initialize `hwInfo = null` (will be set by hardware detection below).
+
+---
+
+**QUESTION 0 — Hardware Detection (MUST ask this FIRST, before role selection)**
+
+Ask this question immediately when entering the loop. Do NOT skip it. Do NOT proceed to role
+selection without asking it first.
+
+```
+AskUserQuestion(
+  question="Run hardware detection? Detects VRAM/RAM so model picker can show which local models fit in VRAM.",
+  options=[
+    "Yes — detect hardware",
+    "No / Skip"
+  ]
+)
+```
+
+If user selects "Yes":
+```bash
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
+```
+Parse the JSON output into `hwInfo`:
+```json
+{ "vram": { "available": true/false, "mb": N, "gb": N, "source": "nvidia-smi" },
+  "ram":  { "available": true, "bytes": N, "gb": N } }
+```
+Display:
+```
+Hardware detected:
+  RAM:  {hwInfo.ram.gb} GB
+  VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})
+```
+If vram.available is false: show `VRAM: unavailable`.
+If command fails: set `hwInfo = null`, show `Hardware detection failed — no labels will be shown`.
+
+If user selects "No / Skip": `hwInfo` stays null.
+
+---
 
 **3a. Role selection**
 
-**MANDATORY: Always show all 12 roles. Never omit any role from the list.**
+Show ALL 12 roles — never omit, never group, never abbreviate:
 
 ```
 AskUserQuestion(
@@ -169,72 +168,73 @@ AskUserQuestion(
     "10. Plan Checker",
     "11. Integration Checker",
     "12. Nyquist Auditor",
-    "0. Exit without changes"
+    "0. Exit"
   ]
 )
 ```
 
-The full list of 12 roles comes from ROLE_FRIENDLY_NAMES — always include all 12 regardless of what model is currently assigned to each role.
-
-If user picks 0 / "Exit without changes" → break loop.
+If user picks 0 → break loop.
 
 Resolve the selected friendly name back to an `agentKey` using the ROLE_FRIENDLY_NAMES mapping above.
 
 **3b. Model selection**
 
-Build the model list dynamically. Number the options sequentially starting from 1:
-- Lines 1..N: `N. <model-name> (<size>)` for each Ollama model from the ollama list result
-  - Use the `name` field exactly as returned (e.g. `qwen2.5:7b`)
-  - Include size in parentheses (e.g. `4.7GB`)
-  - If `hwInfo` is set and `hwInfo.vram.available` is true:
-    - Parse the model size to GB: match `/^([\d.]+)\s*(GB|MB)/i`; GB units are direct, MB units divide by 1024
-    - If modelSizeGb > hwInfo.vram.gb → append ` [exceeds VRAM — will CPU-offload at 1-3 tok/s]`
-    - If modelSizeGb <= hwInfo.vram.gb → append ` [fits in VRAM]`
-    - **CRITICAL: Use the EXACT label strings above. No other format is acceptable.**
-      - CORRECT: `[fits in VRAM]`
-      - CORRECT: `[exceeds VRAM — will CPU-offload at 1-3 tok/s]`
-      - WRONG: "light, fast", "mid", "fits", "exceeds", or any other variation
-  - If `hwInfo` is null or `hwInfo.vram.available` is false: no annotation on any model.
-  - Cloud models (sonnet, haiku, inherit): never annotated regardless of hwInfo.
-- After Ollama models, add the fixed cloud options in this order:
-  - `sonnet`
-  - `haiku`
-  - `inherit`
-  - **MANDATORY: These cloud options (sonnet, haiku, inherit) MUST always appear for every role, regardless of what model is currently assigned to that role. Never filter them out.**
-- After the cloud options, add the custom model option: `Type custom model name`
-- Finally, always add as option 0: `0. Reset to profile default`
+First, compute the profile default for this role:
+```
+profileDefault = MODEL_PROFILES[agentKey][config.model_profile]
+```
+(e.g., for gsd-executor on balanced profile: profileDefault = "sonnet")
 
-If Ollama is unavailable (empty ollamaModels), the list shows cloud options + custom option + Reset.
+Build the picker options:
 
+**Ollama models (options 1..N):**
+Use ALL models from `ollamaModels` — no filtering. For each:
+- Format: `N. {model.name} ({model.size})`
+- If `hwInfo` is set AND `hwInfo.vram.available` is true:
+  - Parse size to GB (match `/^([\d.]+)\s*(GB|MB)/i`; MB ÷ 1024)
+  - modelSizeGb <= hwInfo.vram.gb → append ` [fits in VRAM]`
+  - modelSizeGb > hwInfo.vram.gb → append ` [exceeds VRAM — will CPU-offload at 1-3 tok/s]`
+  - **EXACT strings only. WRONG: "light, fast", "mid", "fits", or any variation.**
+- If hwInfo is null or vram.available is false: no annotation.
+
+**After Ollama models, add cloud options:**
+- `sonnet`
+- `haiku`
+- `inherit`
+
+**After cloud options:**
+- `Type custom model name`
+
+**Always last, as option 0:**
+- `0. Back to profile default (currently: {profileDefault})`
+
+Example with 5 local models, hwInfo.vram.gb = 6.0:
 ```
 AskUserQuestion(
-  question="Select model for [FriendlyName]:",
+  question="Select model for Executor:",
   options=[
-    "1. qwen2.5:7b (4.7GB) [fits in VRAM]",
-    "2. llama3.2:3b (2.0GB) [fits in VRAM]",
-    "3. some-large-model:70b (38GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]",
-    "4. sonnet",
-    "5. haiku",
-    "6. inherit",
-    "7. Type custom model name",
-    "0. Reset to profile default"
+    "1. qwen2.5-coder:32b (19 GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]",
+    "2. qwen2.5-coder:14b (9.0 GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]",
+    "3. qwen2.5-coder:7b (4.7 GB) [fits in VRAM]",
+    "4. llama3.2:latest (2.0 GB) [fits in VRAM]",
+    "5. qwen2.5:7b-instruct-q4_K_M (4.7 GB) [fits in VRAM]",
+    "6. sonnet",
+    "7. haiku",
+    "8. inherit",
+    "9. Type custom model name",
+    "0. Back to profile default (currently: sonnet)"
   ]
 )
 ```
 
 **3c. Determine value to write**
 
-- If user picked an Ollama model (options 1..N where N = ollamaModels.length) → value = `ollama:<model-name>` (e.g. `ollama:qwen2.5:7b`)
-- If user picked a cloud option (`sonnet`, `haiku`, `inherit`) → value = that plain ID as-is
+- If user picked an Ollama model (options 1..N) → value = `ollama:{model.name}` (e.g. `ollama:qwen2.5-coder:7b`)
+- If user picked `sonnet`, `haiku`, or `inherit` → value = that string as-is
 - If user picked "Type custom model name":
-  - Prompt the user to type the model name:
-    ```
-    Enter model name (e.g. ollama:qwen2.5-coder:32b or sonnet):
-    ```
-  - Use the typed value exactly as-is. Do NOT automatically add an `ollama:` prefix.
-  - The user is responsible for specifying the full value (e.g. `ollama:qwen2.5-coder:32b`, `sonnet`, or any other valid model string).
-  - value = whatever the user typed
-- If user picked 0 (Reset) → value = `reset`
+  - Prompt: `Enter model name (e.g. ollama:qwen2.5-coder:32b or sonnet):`
+  - value = whatever the user typed, verbatim. Do NOT add any prefix automatically.
+- If user picked 0 "Back to profile default" → value = `reset`
 
 **3d. Write the assignment**
 
