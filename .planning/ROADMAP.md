@@ -55,7 +55,12 @@ Plans:
   1. When the user requests hardware detection during `/gsd:set-model`, the system reports detected VRAM and RAM
   2. Installed models that exceed detected VRAM are flagged with a warning (e.g., "exceeds VRAM — will CPU-offload at 1-3 tok/s") before the user confirms assignment
   3. Hardware detection failure (unsupported GPU, detection tool missing) is non-fatal — assignment proceeds with a note that hardware info is unavailable
-**Plans**: TBD
+**Plans**: 3 plans
+
+Plans:
+- [ ] 03-01-PLAN.md — Add HW-01 and HW-02 failing test stubs to ollama.test.cjs (Wave 1, TDD RED)
+- [ ] 03-02-PLAN.md — Implement cmdHwDetect and parseSizeGb in ollama.cjs, wire ollama hw-detect (Wave 2)
+- [ ] 03-03-PLAN.md — Patch set-model.md with hardware detection step and feasibility annotations (Wave 3)
 
 ## Progress
 
@@ -66,4 +71,4 @@ Phases execute in numeric order: 1 → 2 → 3
 |-------|----------------|--------|-----------|
 | 1. Execution Foundation | 3/3 | Complete    | 2026-03-16 |
 | 2. Routing and Assignment | 4/4 | Complete   | 2026-03-16 |
-| 3. Hardware Suggestions | 0/TBD | Not started | - |
+| 3. Hardware Suggestions | 0/3 | Not started | - |
