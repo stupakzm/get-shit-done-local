@@ -14,10 +14,15 @@ Read all files referenced by the invoking prompt's execution_context before star
 Run both commands to gather current state:
 
 ```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama list --raw
+node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama list
 ```
 
-Parse the JSON result. If the command fails or Ollama is unreachable, treat `ollamaModels` as an
+Parse the JSON result. The response shape is:
+```json
+{ "models": [{ "name": "qwen2.5-coder:7b", "id": "...", "size": "4.7 GB" }, ...] }
+```
+Set `ollamaModels` to `result.models` (the array). Display ALL models from the result — no filtering or
+truncation. If the command fails or Ollama is unreachable, treat `ollamaModels` as an
 empty array and note "Ollama unavailable" — cloud options are still shown in the picker.
 
 ```bash
@@ -99,16 +104,21 @@ Otherwise, continue to the role_picker_loop.
 </step>
 
 <step name="detect_hardware">
-Before entering the role picker, offer the user the option to run hardware detection.
+**MANDATORY: This step MUST execute before role_picker_loop. Do not skip it.**
 
-Ask:
+Use AskUserQuestion to present the hardware detection option. This is a required interactive step:
+
 ```
-Would you like to run hardware detection? This shows how much VRAM and RAM your system
-has, so the model picker can flag which models will fit in VRAM.
-Options: [Yes] [No / Skip]
+AskUserQuestion(
+  question="Would you like to run hardware detection before selecting models? This detects your VRAM and RAM so the model picker can show which models will fit in VRAM.",
+  options=[
+    "1. Yes — detect hardware now",
+    "2. No / Skip — proceed without feasibility labels"
+  ]
+)
 ```
 
-If user selects Yes:
+If user selects 1 (Yes):
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
 ```
@@ -129,7 +139,9 @@ If the command fails for any reason, set `hwInfo = null` and display:
 Hardware detection failed — model picker will proceed without feasibility labels.
 ```
 
-If user selects No / Skip: set `hwInfo = null`. Proceed to role_picker_loop.
+If user selects 2 (No / Skip): set `hwInfo = null`.
+
+After this step completes (either path), proceed immediately to role_picker_loop.
 </step>
 
 <step name="role_picker_loop">
@@ -138,6 +150,8 @@ This is the main assignment loop. Repeat until user selects Exit or says No to "
 Track whether any changes were made (start with `changesMade = false`).
 
 **3a. Role selection**
+
+**MANDATORY: Always show all 12 roles. Never omit any role from the list.**
 
 ```
 AskUserQuestion(
@@ -160,6 +174,8 @@ AskUserQuestion(
 )
 ```
 
+The full list of 12 roles comes from ROLE_FRIENDLY_NAMES — always include all 12 regardless of what model is currently assigned to each role.
+
 If user picks 0 / "Exit without changes" → break loop.
 
 Resolve the selected friendly name back to an `agentKey` using the ROLE_FRIENDLY_NAMES mapping above.
@@ -174,25 +190,33 @@ Build the model list dynamically. Number the options sequentially starting from 
     - Parse the model size to GB: match `/^([\d.]+)\s*(GB|MB)/i`; GB units are direct, MB units divide by 1024
     - If modelSizeGb > hwInfo.vram.gb → append ` [exceeds VRAM — will CPU-offload at 1-3 tok/s]`
     - If modelSizeGb <= hwInfo.vram.gb → append ` [fits in VRAM]`
+    - **CRITICAL: Use the EXACT label strings above. No other format is acceptable.**
+      - CORRECT: `[fits in VRAM]`
+      - CORRECT: `[exceeds VRAM — will CPU-offload at 1-3 tok/s]`
+      - WRONG: "light, fast", "mid", "fits", "exceeds", or any other variation
   - If `hwInfo` is null or `hwInfo.vram.available` is false: no annotation on any model.
   - Cloud models (sonnet, haiku, inherit): never annotated regardless of hwInfo.
 - After Ollama models, add the fixed cloud options in this order:
   - `sonnet`
   - `haiku`
   - `inherit`
+  - **MANDATORY: These cloud options (sonnet, haiku, inherit) MUST always appear for every role, regardless of what model is currently assigned to that role. Never filter them out.**
+- After the cloud options, add the custom model option: `Type custom model name`
 - Finally, always add as option 0: `0. Reset to profile default`
 
-If Ollama is unavailable (empty ollamaModels), the list shows only cloud options + Reset.
+If Ollama is unavailable (empty ollamaModels), the list shows cloud options + custom option + Reset.
 
 ```
 AskUserQuestion(
   question="Select model for [FriendlyName]:",
   options=[
-    "1. qwen2.5:7b (4.7GB)",
-    "2. llama3.2:3b (2.0GB)",
-    "3. sonnet",
-    "4. haiku",
-    "5. inherit",
+    "1. qwen2.5:7b (4.7GB) [fits in VRAM]",
+    "2. llama3.2:3b (2.0GB) [fits in VRAM]",
+    "3. some-large-model:70b (38GB) [exceeds VRAM — will CPU-offload at 1-3 tok/s]",
+    "4. sonnet",
+    "5. haiku",
+    "6. inherit",
+    "7. Type custom model name",
     "0. Reset to profile default"
   ]
 )
@@ -202,6 +226,14 @@ AskUserQuestion(
 
 - If user picked an Ollama model (options 1..N where N = ollamaModels.length) → value = `ollama:<model-name>` (e.g. `ollama:qwen2.5:7b`)
 - If user picked a cloud option (`sonnet`, `haiku`, `inherit`) → value = that plain ID as-is
+- If user picked "Type custom model name":
+  - Prompt the user to type the model name:
+    ```
+    Enter model name (e.g. ollama:qwen2.5-coder:32b or sonnet):
+    ```
+  - Use the typed value exactly as-is. Do NOT automatically add an `ollama:` prefix.
+  - The user is responsible for specifying the full value (e.g. `ollama:qwen2.5-coder:32b`, `sonnet`, or any other valid model string).
+  - value = whatever the user typed
 - If user picked 0 (Reset) → value = `reset`
 
 **3d. Write the assignment**
