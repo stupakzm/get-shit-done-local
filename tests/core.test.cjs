@@ -120,6 +120,34 @@ describe('loadConfig', () => {
     const config = loadConfig(tmpDir);
     assert.strictEqual(config.commit_docs, false);
   });
+
+  // EXEC-06: ollama_path pass-through guarantee
+  test('returns ollama_path as null for cloud-only config (no ollama_path key)', () => {
+    writeConfig({ model_profile: 'balanced' });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.ollama_path, null);
+  });
+
+  test('returns ollama_path value when set in config', () => {
+    writeConfig({ ollama_path: '/usr/local/bin/ollama' });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.ollama_path, '/usr/local/bin/ollama');
+  });
+
+  test('returns ollama_path as null when set to empty string', () => {
+    writeConfig({ ollama_path: '' });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.ollama_path, null);
+  });
+
+  test('existing config keys unchanged when ollama_path is absent (EXEC-06 pass-through)', () => {
+    writeConfig({ model_profile: 'quality', commit_docs: false, brave_search: true });
+    const config = loadConfig(tmpDir);
+    assert.strictEqual(config.model_profile, 'quality');
+    assert.strictEqual(config.commit_docs, false);
+    assert.strictEqual(config.brave_search, true);
+    assert.strictEqual(config.ollama_path, null);
+  });
 });
 
 // ─── resolveModelInternal ──────────────────────────────────────────────────────

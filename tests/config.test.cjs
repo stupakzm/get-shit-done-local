@@ -372,3 +372,34 @@ describe('config-get command', () => {
     assert.strictEqual(result.success, false);
   });
 });
+
+// ─── ollama_path config key (EXEC-06) ─────────────────────────────────────────
+
+describe('ollama_path config key (EXEC-06)', () => {
+  let tmpDir;
+
+  beforeEach(() => {
+    tmpDir = createTempProject();
+    runGsdTools('config-ensure-section', tmpDir);
+  });
+
+  afterEach(() => {
+    cleanup(tmpDir);
+  });
+
+  test('config-set ollama_path succeeds (key is in VALID_CONFIG_KEYS whitelist)', () => {
+    const result = runGsdTools('config-set ollama_path /usr/local/bin/ollama', tmpDir);
+    assert.ok(result.success, `config-set ollama_path should succeed: ${result.error}`);
+
+    const config = readConfig(tmpDir);
+    assert.strictEqual(config.ollama_path, '/usr/local/bin/ollama');
+  });
+
+  test('config-set ollama_path stores the value and config-get retrieves it', () => {
+    runGsdTools('config-set ollama_path /custom/path/ollama', tmpDir);
+
+    const result = runGsdTools('config-get ollama_path', tmpDir);
+    assert.ok(result.success, `config-get ollama_path should succeed: ${result.error}`);
+    assert.strictEqual(JSON.parse(result.output), '/custom/path/ollama');
+  });
+});
