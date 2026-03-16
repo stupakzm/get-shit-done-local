@@ -16,8 +16,8 @@
 
 ### Command
 
-- [ ] **CMD-01**: `/gsd:set-model` command presents an interactive numbered picker of installed Ollama models for role assignment
-- [ ] **CMD-02**: Picker displays model size next to each model name (e.g., `qwen2.5-coder:32b (19GB)`)
+- [x] **CMD-01**: `/gsd:set-model` command presents an interactive numbered picker of installed Ollama models for role assignment
+- [x] **CMD-02**: Picker displays model size next to each model name (e.g., `qwen2.5-coder:32b (19GB)`)
 - [x] **CMD-03**: User can view current role → model assignment table at any time via `/gsd:set-model` or a sub-option
 - [x] **CMD-04**: After assignment, `/gsd:set-model` displays a config diff showing what changed (e.g., `gsd-planner: sonnet → qwen2.5-coder:32b`)
 
@@ -62,8 +62,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | EXEC-04 | Phase 1 | Complete |
 | EXEC-05 | Phase 1 | Complete |
 | EXEC-06 | Phase 1 | Complete |
-| CMD-01 | Phase 2 | Pending |
-| CMD-02 | Phase 2 | Pending |
+| CMD-01 | Phase 2 | Complete |
+| CMD-02 | Phase 2 | Complete |
 | CMD-03 | Phase 2 | Complete |
 | CMD-04 | Phase 2 | Complete |
 | HW-01 | Phase 3 | Pending |
