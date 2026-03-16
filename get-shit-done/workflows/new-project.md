@@ -546,7 +546,20 @@ Display spawning indicator:
   → Pitfalls research
 ```
 
-Spawn 4 parallel gsd-project-researcher agents with path references:
+Spawn 4 parallel gsd-project-researcher agents with path references.
+
+Apply the ollama: routing guard before each researcher spawn:
+
+```bash
+if [[ "{researcher_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${researcher_model#ollama:}"
+  echo "$researcher_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(prompt="...", subagent_type="gsd-project-researcher", model="{researcher_model}", description="...")
+fi
+```
+
+The prompt for each of the 4 dimensions (Stack, Features, Architecture, Pitfalls):
 
 ```
 Task(prompt="<research_type>
@@ -704,8 +717,28 @@ Use template: ~/.claude/get-shit-done/templates/research-project/PITFALLS.md
 
 After all 4 agents complete, spawn synthesizer to create SUMMARY.md:
 
-```
-Task(prompt="
+```bash
+if [[ "{synthesizer_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${synthesizer_model#ollama:}"
+  SYNTH_PROMPT="<task>
+Synthesize research outputs into SUMMARY.md.
+</task>
+
+<files_to_read>
+- .planning/research/STACK.md
+- .planning/research/FEATURES.md
+- .planning/research/ARCHITECTURE.md
+- .planning/research/PITFALLS.md
+</files_to_read>
+
+<output>
+Write to: .planning/research/SUMMARY.md
+Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
+Commit after writing.
+</output>"
+  echo "$SYNTH_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(prompt="
 <task>
 Synthesize research outputs into SUMMARY.md.
 </task>
@@ -723,6 +756,7 @@ Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 </output>
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
+fi
 ```
 
 Display research complete banner and key findings:
@@ -900,8 +934,34 @@ Display stage banner:
 
 Spawn gsd-roadmapper agent with path references:
 
-```
-Task(prompt="
+```bash
+if [[ "{roadmapper_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${roadmapper_model#ollama:}"
+  ROADMAP_PROMPT="<planning_context>
+
+<files_to_read>
+- .planning/PROJECT.md (Project context)
+- .planning/REQUIREMENTS.md (v1 Requirements)
+- .planning/research/SUMMARY.md (Research findings - if exists)
+- .planning/config.json (Granularity and mode settings)
+</files_to_read>
+
+</planning_context>
+
+<instructions>
+Create roadmap:
+1. Derive phases from requirements (don't impose structure)
+2. Map every v1 requirement to exactly one phase
+3. Derive 2-5 success criteria per phase (observable user behaviors)
+4. Validate 100% coverage
+5. Write files immediately (ROADMAP.md, STATE.md, update REQUIREMENTS.md traceability)
+6. Return ROADMAP CREATED with summary
+
+Write files first, then return. This ensures artifacts persist even if context is lost.
+</instructions>"
+  echo "$ROADMAP_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(prompt="
 <planning_context>
 
 <files_to_read>
@@ -925,6 +985,7 @@ Create roadmap:
 Write files first, then return. This ensures artifacts persist even if context is lost.
 </instructions>
 ", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
+fi
 ```
 
 **Handle roadmapper return:**
@@ -991,8 +1052,23 @@ Use AskUserQuestion:
 **If "Adjust phases":**
 - Get user's adjustment notes
 - Re-spawn roadmapper with revision context:
-  ```
-  Task(prompt="
+  ```bash
+  if [[ "{roadmapper_model}" == ollama:* ]]; then
+    OLLAMA_MODEL_NAME="${roadmapper_model#ollama:}"
+    REVISION_PROMPT="<revision>
+User feedback on roadmap:
+[user's notes]
+
+<files_to_read>
+- .planning/ROADMAP.md (Current roadmap to revise)
+</files_to_read>
+
+Update the roadmap based on feedback. Edit files in place.
+Return ROADMAP REVISED with changes made.
+</revision>"
+    echo "$REVISION_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+  else
+    Task(prompt="
   <revision>
   User feedback on roadmap:
   [user's notes]
@@ -1005,6 +1081,7 @@ Use AskUserQuestion:
   Return ROADMAP REVISED with changes made.
   </revision>
   ", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Revise roadmap")
+  fi
   ```
 - Present revised roadmap
 - Loop until user approves

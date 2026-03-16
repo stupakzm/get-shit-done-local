@@ -41,9 +41,30 @@ if [[ "$INIT" == @file:* ]]; then INIT=$(cat "${INIT#@file:}"); fi
 
 ## Step 4: Spawn Researcher
 
-```
-Task(
-  prompt="<objective>
+```bash
+if [[ "{researcher_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${researcher_model#ollama:}"
+  PROMPT_CONTENT="<objective>
+Research implementation approach for Phase {phase}: {name}
+</objective>
+
+<files_to_read>
+- {context_path} (USER DECISIONS from /gsd:discuss-phase)
+- {requirements_path} (Project requirements)
+- {state_path} (Project decisions and history)
+</files_to_read>
+
+<additional_context>
+Phase description: {description}
+</additional_context>
+
+<output>
+Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
+</output>"
+  echo "$PROMPT_CONTENT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="<objective>
 Research implementation approach for Phase {phase}: {name}
 </objective>
 
@@ -60,9 +81,10 @@ Phase description: {description}
 <output>
 Write to: .planning/phases/${PHASE}-{slug}/${PHASE}-RESEARCH.md
 </output>",
-  subagent_type="gsd-phase-researcher",
-  model="{researcher_model}"
-)
+    subagent_type="gsd-phase-researcher",
+    model="{researcher_model}"
+  )
+fi
 ```
 
 ## Step 5: Handle Return

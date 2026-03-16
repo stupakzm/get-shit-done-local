@@ -222,13 +222,18 @@ Write to: {phase_dir}/{phase_num}-RESEARCH.md
 </output>
 ```
 
-```
-Task(
-  prompt=research_prompt,
-  subagent_type="gsd-phase-researcher",
-  model="{researcher_model}",
-  description="Research Phase {phase}"
-)
+```bash
+if [[ "{researcher_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${researcher_model#ollama:}"
+  echo "$research_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt=research_prompt,
+    subagent_type="gsd-phase-researcher",
+    model="{researcher_model}",
+    description="Research Phase {phase}"
+  )
+fi
 ```
 
 ### Handle Researcher Return
@@ -436,13 +441,18 @@ Every task MUST include these fields — they are NOT optional:
 </quality_gate>
 ```
 
-```
-Task(
-  prompt=filled_prompt,
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Plan Phase {phase}"
-)
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$filled_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt=filled_prompt,
+    subagent_type="gsd-planner",
+    model="{planner_model}",
+    description="Plan Phase {phase}"
+  )
+fi
 ```
 
 ## 9. Handle Planner Return
@@ -489,13 +499,18 @@ Checker prompt:
 </expected_output>
 ```
 
-```
-Task(
-  prompt=checker_prompt,
-  subagent_type="gsd-plan-checker",
-  model="{checker_model}",
-  description="Verify Phase {phase} plans"
-)
+```bash
+if [[ "{checker_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${checker_model#ollama:}"
+  echo "$checker_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt=checker_prompt,
+    subagent_type="gsd-plan-checker",
+    model="{checker_model}",
+    description="Verify Phase {phase} plans"
+  )
+fi
 ```
 
 ## 11. Handle Checker Return
@@ -533,13 +548,18 @@ Return what changed.
 </instructions>
 ```
 
-```
-Task(
-  prompt=revision_prompt,
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Revise Phase {phase} plans"
-)
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$revision_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt=revision_prompt,
+    subagent_type="gsd-planner",
+    model="{planner_model}",
+    description="Revise Phase {phase} plans"
+  )
+fi
 ```
 
 After planner returns -> spawn checker again (step 10), increment iteration_count.

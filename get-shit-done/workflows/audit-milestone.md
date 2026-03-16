@@ -60,9 +60,25 @@ With phase context collected:
 
 Extract `MILESTONE_REQ_IDS` from REQUIREMENTS.md traceability table — all REQ-IDs assigned to phases in this milestone.
 
-```
-Task(
-  prompt="Check cross-phase integration and E2E flows.
+```bash
+if [[ "$integration_checker_model" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${integration_checker_model#ollama:}"
+  PROMPT_CONTENT="Check cross-phase integration and E2E flows.
+
+Phases: {phase_dirs}
+Phase exports: {from SUMMARYs}
+API routes: {routes created}
+
+Milestone Requirements:
+{MILESTONE_REQ_IDS — list each REQ-ID with description and assigned phase}
+
+MUST map each integration finding to affected requirement IDs where applicable.
+
+Verify cross-phase wiring and E2E user flows."
+  echo "$PROMPT_CONTENT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="Check cross-phase integration and E2E flows.
 
 Phases: {phase_dirs}
 Phase exports: {from SUMMARYs}
@@ -74,9 +90,10 @@ Milestone Requirements:
 MUST map each integration finding to affected requirement IDs where applicable.
 
 Verify cross-phase wiring and E2E user flows.",
-  subagent_type="gsd-integration-checker",
-  model="{integration_checker_model}"
-)
+    subagent_type="gsd-integration-checker",
+    model="{integration_checker_model}"
+  )
+fi
 ```
 
 ## 4. Collect Results

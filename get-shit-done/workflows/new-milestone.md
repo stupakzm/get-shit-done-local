@@ -120,8 +120,15 @@ mkdir -p .planning/research
 Spawn 4 parallel gsd-project-researcher agents. Each uses this template with dimension-specific fields:
 
 **Common structure for all 4 researchers:**
-```
-Task(prompt="
+
+For each researcher, apply the ollama: routing guard before spawning:
+
+```bash
+if [[ "{researcher_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${researcher_model#ollama:}"
+  echo "$researcher_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(prompt="
 <research_type>Project Research — {DIMENSION} for [new features].</research_type>
 
 <milestone_context>
@@ -145,6 +152,7 @@ Write to: .planning/research/{FILE}
 Use template: ~/.claude/get-shit-done/templates/research-project/{FILE}
 </output>
 ", subagent_type="gsd-project-researcher", model="{researcher_model}", description="{DIMENSION} research")
+fi
 ```
 
 **Dimension-specific fields:**
@@ -159,8 +167,24 @@ Use template: ~/.claude/get-shit-done/templates/research-project/{FILE}
 
 After all 4 complete, spawn synthesizer:
 
-```
-Task(prompt="
+```bash
+if [[ "{synthesizer_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${synthesizer_model#ollama:}"
+  SYNTH_PROMPT="Synthesize research outputs into SUMMARY.md.
+
+<files_to_read>
+- .planning/research/STACK.md
+- .planning/research/FEATURES.md
+- .planning/research/ARCHITECTURE.md
+- .planning/research/PITFALLS.md
+</files_to_read>
+
+Write to: .planning/research/SUMMARY.md
+Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
+Commit after writing."
+  echo "$SYNTH_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(prompt="
 Synthesize research outputs into SUMMARY.md.
 
 <files_to_read>
@@ -174,6 +198,7 @@ Write to: .planning/research/SUMMARY.md
 Use template: ~/.claude/get-shit-done/templates/research-project/SUMMARY.md
 Commit after writing.
 ", subagent_type="gsd-research-synthesizer", model="{synthesizer_model}", description="Synthesize research")
+fi
 ```
 
 Display key findings from SUMMARY.md:
@@ -272,8 +297,34 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs: define milest
 
 **Starting phase number:** Read MILESTONES.md for last phase number. Continue from there (v1.0 ended at phase 5 → v1.1 starts at phase 6).
 
-```
-Task(prompt="
+```bash
+if [[ "{roadmapper_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${roadmapper_model#ollama:}"
+  ROADMAP_PROMPT="<planning_context>
+<files_to_read>
+- .planning/PROJECT.md
+- .planning/REQUIREMENTS.md
+- .planning/research/SUMMARY.md (if exists)
+- .planning/config.json
+- .planning/MILESTONES.md
+</files_to_read>
+</planning_context>
+
+<instructions>
+Create roadmap for milestone v[X.Y]:
+1. Start phase numbering from [N]
+2. Derive phases from THIS MILESTONE's requirements only
+3. Map every requirement to exactly one phase
+4. Derive 2-5 success criteria per phase (observable user behaviors)
+5. Validate 100% coverage
+6. Write files immediately (ROADMAP.md, STATE.md, update REQUIREMENTS.md traceability)
+7. Return ROADMAP CREATED with summary
+
+Write files first, then return.
+</instructions>"
+  echo "$ROADMAP_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(prompt="
 <planning_context>
 <files_to_read>
 - .planning/PROJECT.md
@@ -297,6 +348,7 @@ Create roadmap for milestone v[X.Y]:
 Write files first, then return.
 </instructions>
 ", subagent_type="gsd-roadmapper", model="{roadmapper_model}", description="Create roadmap")
+fi
 ```
 
 **Handle return:**

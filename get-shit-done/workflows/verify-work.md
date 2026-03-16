@@ -372,9 +372,13 @@ Display:
 
 Spawn gsd-planner in --gaps mode:
 
-```
-Task(
-  prompt="""
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$gap_plan_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="""
 <planning_context>
 
 **Phase:** {phase_number}
@@ -393,10 +397,11 @@ Output consumed by /gsd:execute-phase
 Plans must be executable prompts.
 </downstream_consumer>
 """,
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Plan gap fixes for Phase {phase}"
-)
+    subagent_type="gsd-planner",
+    model="{planner_model}",
+    description="Plan gap fixes for Phase {phase}"
+  )
+fi
 ```
 
 On return:
@@ -420,9 +425,13 @@ Initialize: `iteration_count = 1`
 
 Spawn gsd-plan-checker:
 
-```
-Task(
-  prompt="""
+```bash
+if [[ "{checker_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${checker_model#ollama:}"
+  echo "$checker_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="""
 <verification_context>
 
 **Phase:** {phase_number}
@@ -440,10 +449,11 @@ Return one of:
 - ## ISSUES FOUND — structured issue list
 </expected_output>
 """,
-  subagent_type="gsd-plan-checker",
-  model="{checker_model}",
-  description="Verify Phase {phase} fix plans"
-)
+    subagent_type="gsd-plan-checker",
+    model="{checker_model}",
+    description="Verify Phase {phase} fix plans"
+  )
+fi
 ```
 
 On return:
@@ -460,9 +470,13 @@ Display: `Sending back to planner for revision... (iteration {N}/3)`
 
 Spawn gsd-planner with revision context:
 
-```
-Task(
-  prompt="""
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$revision_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="""
 <revision_context>
 
 **Phase:** {phase_number}
@@ -482,10 +496,11 @@ Read existing PLAN.md files. Make targeted updates to address checker issues.
 Do NOT replan from scratch unless issues are fundamental.
 </instructions>
 """,
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Revise Phase {phase} plans"
-)
+    subagent_type="gsd-planner",
+    model="{planner_model}",
+    description="Revise Phase {phase} plans"
+  )
+fi
 ```
 
 After planner returns → spawn checker again (verify_gap_plans logic)

@@ -288,9 +288,13 @@ Display banner:
 
 Spawn a single focused researcher (not 4 parallel researchers like full phases — quick tasks need targeted research, not broad domain surveys):
 
-```
-Task(
-  prompt="
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$research_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="
 <research_context>
 
 **Mode:** quick-task
@@ -322,10 +326,11 @@ Use standard research format but keep it lean — skip sections that don't apply
 Return: ## RESEARCH COMPLETE with file path
 </output>
 ",
-  subagent_type="gsd-phase-researcher",
-  model="{planner_model}",
-  description="Research: ${DESCRIPTION}"
-)
+    subagent_type="gsd-phase-researcher",
+    model="{planner_model}",
+    description="Research: ${DESCRIPTION}"
+  )
+fi
 ```
 
 After researcher returns:
@@ -342,9 +347,13 @@ If research file not found, warn but continue: "Research agent did not produce o
 
 **If NOT `$FULL_MODE`:** Use standard `quick` mode.
 
-```
-Task(
-  prompt="
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$planner_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="
 <planning_context>
 
 **Mode:** ${FULL_MODE ? 'quick-full' : 'quick'}
@@ -376,10 +385,11 @@ Write plan to: ${QUICK_DIR}/${quick_id}-PLAN.md
 Return: ## PLANNING COMPLETE with plan path
 </output>
 ",
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Quick plan: ${DESCRIPTION}"
-)
+    subagent_type="gsd-planner",
+    model="{planner_model}",
+    description="Quick plan: ${DESCRIPTION}"
+  )
+fi
 ```
 
 After planner returns:
@@ -435,13 +445,18 @@ ${DISCUSS_MODE ? '- Context compliance: Does the plan honor locked decisions fro
 </expected_output>
 ```
 
-```
-Task(
-  prompt=checker_prompt,
-  subagent_type="gsd-plan-checker",
-  model="{checker_model}",
-  description="Check quick plan: ${DESCRIPTION}"
-)
+```bash
+if [[ "{checker_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${checker_model#ollama:}"
+  echo "$checker_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt=checker_prompt,
+    subagent_type="gsd-plan-checker",
+    model="{checker_model}",
+    description="Check quick plan: ${DESCRIPTION}"
+  )
+fi
 ```
 
 **Handle checker return:**
@@ -478,13 +493,18 @@ Return what changed.
 </instructions>
 ```
 
-```
-Task(
-  prompt=revision_prompt,
-  subagent_type="gsd-planner",
-  model="{planner_model}",
-  description="Revise quick plan: ${DESCRIPTION}"
-)
+```bash
+if [[ "{planner_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${planner_model#ollama:}"
+  echo "$revision_prompt" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt=revision_prompt,
+    subagent_type="gsd-planner",
+    model="{planner_model}",
+    description="Revise quick plan: ${DESCRIPTION}"
+  )
+fi
 ```
 
 After planner returns → spawn checker again, increment iteration_count.
@@ -501,9 +521,28 @@ Offer: 1) Force proceed, 2) Abort
 
 Spawn gsd-executor with plan reference:
 
-```
-Task(
-  prompt="
+```bash
+if [[ "{executor_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${executor_model#ollama:}"
+  EXECUTOR_PROMPT="Execute quick task ${quick_id}.
+
+<files_to_read>
+- ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
+- .planning/STATE.md (Project state)
+- ./CLAUDE.md (Project instructions, if exists)
+- .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
+</files_to_read>
+
+<constraints>
+- Execute all tasks in the plan
+- Commit each task atomically
+- Create summary at: ${QUICK_DIR}/${quick_id}-SUMMARY.md
+- Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
+</constraints>"
+  echo "$EXECUTOR_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="
 Execute quick task ${quick_id}.
 
 <files_to_read>
@@ -520,10 +559,11 @@ Execute quick task ${quick_id}.
 - Do NOT update ROADMAP.md (quick tasks are separate from planned phases)
 </constraints>
 ",
-  subagent_type="gsd-executor",
-  model="{executor_model}",
-  description="Execute: ${DESCRIPTION}"
-)
+    subagent_type="gsd-executor",
+    model="{executor_model}",
+    description="Execute: ${DESCRIPTION}"
+  )
+fi
 ```
 
 After executor returns:
@@ -552,9 +592,22 @@ Display banner:
 ◆ Spawning verifier...
 ```
 
-```
-Task(
-  prompt="Verify quick task goal achievement.
+```bash
+if [[ "{verifier_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${verifier_model#ollama:}"
+  VERIFIER_PROMPT="Verify quick task goal achievement.
+Task directory: ${QUICK_DIR}
+Task goal: ${DESCRIPTION}
+
+<files_to_read>
+- ${QUICK_DIR}/${quick_id}-PLAN.md (Plan)
+</files_to_read>
+
+Check must_haves against actual codebase. Create VERIFICATION.md at ${QUICK_DIR}/${quick_id}-VERIFICATION.md."
+  echo "$VERIFIER_PROMPT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="Verify quick task goal achievement.
 Task directory: ${QUICK_DIR}
 Task goal: ${DESCRIPTION}
 
@@ -563,10 +616,11 @@ Task goal: ${DESCRIPTION}
 </files_to_read>
 
 Check must_haves against actual codebase. Create VERIFICATION.md at ${QUICK_DIR}/${quick_id}-VERIFICATION.md.",
-  subagent_type="gsd-verifier",
-  model="{verifier_model}",
-  description="Verify: ${DESCRIPTION}"
-)
+    subagent_type="gsd-verifier",
+    model="{verifier_model}",
+    description="Verify: ${DESCRIPTION}"
+  )
+fi
 ```
 
 Read verification status:
