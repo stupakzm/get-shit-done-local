@@ -139,6 +139,7 @@ const milestone = require('./lib/milestone.cjs');
 const commands = require('./lib/commands.cjs');
 const init = require('./lib/init.cjs');
 const frontmatter = require('./lib/frontmatter.cjs');
+const ollama = require('./lib/ollama.cjs');
 
 // ─── CLI Router ───────────────────────────────────────────────────────────────
 
@@ -592,6 +593,32 @@ async function main() {
         limit: limitIdx !== -1 ? parseInt(args[limitIdx + 1], 10) : 10,
         freshness: freshnessIdx !== -1 ? args[freshnessIdx + 1] : null,
       }, raw);
+      break;
+    }
+
+    case 'ollama': {
+      const subcommand = args[1];
+      if (subcommand === 'list') {
+        ollama.cmdOllamaList(cwd, raw);
+      } else if (subcommand === 'run') {
+        const modelName = args[2];
+        const promptFileIdx = args.indexOf('--prompt-file');
+        let prompt;
+        if (promptFileIdx !== -1) {
+          const promptFile = args[promptFileIdx + 1];
+          try {
+            prompt = fs.readFileSync(promptFile, 'utf-8');
+          } catch (e) {
+            error('Failed to read prompt file: ' + e.message);
+          }
+        } else {
+          // Cross-platform stdin: fd 0 works on Windows, Linux, macOS (Node.js built-in)
+          prompt = fs.readFileSync(0, 'utf-8');
+        }
+        ollama.cmdOllamaRun(cwd, modelName, prompt, raw);
+      } else {
+        error(`Unknown ollama subcommand: ${subcommand}. Valid: list, run`);
+      }
       break;
     }
 
