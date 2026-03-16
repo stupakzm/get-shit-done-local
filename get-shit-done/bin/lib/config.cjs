@@ -299,9 +299,59 @@ function getCmdConfigSetModelProfileResultMessage(
   return paragraphs.join('\n\n');
 }
 
+/**
+ * Command to set or delete a model override for a specific agent key.
+ *
+ * SET path: writes model_overrides.<agentKey> = value
+ * RESET path: deletes model_overrides.<agentKey>; removes top-level key if object becomes empty
+ *
+ * Note that this exits the process (via `output()`) even in the happy path.
+ */
+function cmdConfigSetModelOverride(cwd, agentKey, value, raw) {
+  if (!agentKey || !value) {
+    error('Usage: config-set-model-override <agent-key> <value|reset>');
+  }
+
+  ensureConfigFile(cwd);
+
+  if (value === 'reset') {
+    // RESET path: delete the key from model_overrides
+    const configPath = path.join(cwd, '.planning', 'config.json');
+    let config = {};
+    try {
+      config = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    } catch (err) {
+      error('Failed to read config.json: ' + err.message);
+    }
+
+    const prev = config.model_overrides?.[agentKey];
+    if (config.model_overrides) {
+      delete config.model_overrides[agentKey];
+      // Remove top-level key if model_overrides is now empty
+      if (Object.keys(config.model_overrides).length === 0) {
+        delete config.model_overrides;
+      }
+    }
+
+    try {
+      fs.writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8');
+    } catch (err) {
+      error('Failed to write config.json: ' + err.message);
+    }
+
+    const result = { updated: true, key: agentKey, value: null, previousValue: prev };
+    output(result, raw, agentKey + ' reset to profile default (was: ' + (prev ?? 'none') + ')');
+  } else {
+    // SET path: write model_overrides.<agentKey> = value
+    const result = setConfigValue(cwd, 'model_overrides.' + agentKey, value);
+    output(result, raw, agentKey + '=' + value + ' (was: ' + (result.previousValue ?? 'none') + ')');
+  }
+}
+
 module.exports = {
   cmdConfigEnsureSection,
   cmdConfigSet,
   cmdConfigGet,
   cmdConfigSetModelProfile,
+  cmdConfigSetModelOverride,
 };

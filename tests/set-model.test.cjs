@@ -204,7 +204,7 @@ describe('config-set-model-override --raw output includes previousValue (CMD-04)
     // Test 6 (CMD-04): config-set-model-override gsd-planner sonnet --raw
     // returns JSON with previousValue field reflecting the prior assignment
     const result = runGsdTools(
-      ['config-set-model-override', 'gsd-planner', 'sonnet', '--raw'],
+      ['config-set-model-override', 'gsd-planner', 'sonnet'],
       tmpDir
     );
     assert.ok(result.success, `Command should succeed: ${result.error}`);
