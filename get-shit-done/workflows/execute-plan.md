@@ -67,7 +67,18 @@ grep -n "type=\"checkpoint" .planning/phases/XX-name/{phase}-{plan}-PLAN.md
 | Verify-only | B (segmented) | Segments between checkpoints. After none/human-verify → SUBAGENT. After decision/human-action → MAIN |
 | Decision | C (main) | Execute entirely in main context |
 
-**Pattern A:** init_agent_tracking → spawn Task(subagent_type="gsd-executor", model=executor_model) with prompt: execute plan at [path], autonomous, all tasks + SUMMARY + commit, follow deviation/auth rules, report: plan name, tasks, SUMMARY path, commit hash → track agent_id → wait → update tracking → report.
+**Pattern A:** init_agent_tracking → check executor_model routing:
+
+```bash
+if [[ "$executor_model" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${executor_model#ollama:}"
+  cat "$PLAN_PATH" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(subagent_type="gsd-executor", model=executor_model, prompt="...")
+fi
+```
+
+For cloud models: spawn Task(subagent_type="gsd-executor", model=executor_model) with prompt: execute plan at [path], autonomous, all tasks + SUMMARY + commit, follow deviation/auth rules, report: plan name, tasks, SUMMARY path, commit hash. For ollama: models: pipe plan file content to gsd-tools ollama run, capture output as agent response. Either way → track agent_id → wait → update tracking → report.
 
 **Pattern B:** Execute segment-by-segment. Autonomous segments: spawn subagent for assigned tasks only (no SUMMARY/commit). Checkpoints: main context. After all segments: aggregate, create SUMMARY, commit. See segment_execution.
 

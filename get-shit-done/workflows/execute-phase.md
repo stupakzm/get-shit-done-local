@@ -108,41 +108,74 @@ Execute each wave in sequence. Within a wave: parallel if `PARALLELIZATION=true`
    Pass paths only — executors read files themselves with their fresh 200k context.
    This keeps orchestrator context lean (~10-15%).
 
-   ```
-   Task(
-     subagent_type="gsd-executor",
-     model="{executor_model}",
-     prompt="
-       <objective>
-       Execute plan {plan_number} of phase {phase_number}-{phase_name}.
-       Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
-       </objective>
+   ```bash
+   if [[ "{executor_model}" == ollama:* ]]; then
+     OLLAMA_MODEL_NAME="${executor_model#ollama:}"
+     PROMPT_CONTENT="<objective>
+Execute plan {plan_number} of phase {phase_number}-{phase_name}.
+Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
+</objective>
 
-       <execution_context>
-       @~/.claude/get-shit-done/workflows/execute-plan.md
-       @~/.claude/get-shit-done/templates/summary.md
-       @~/.claude/get-shit-done/references/checkpoints.md
-       @~/.claude/get-shit-done/references/tdd.md
-       </execution_context>
+<execution_context>
+@~/.claude/get-shit-done/workflows/execute-plan.md
+@~/.claude/get-shit-done/templates/summary.md
+@~/.claude/get-shit-done/references/checkpoints.md
+@~/.claude/get-shit-done/references/tdd.md
+</execution_context>
 
-       <files_to_read>
-       Read these files at execution start using the Read tool:
-       - {phase_dir}/{plan_file} (Plan)
-       - .planning/STATE.md (State)
-       - .planning/config.json (Config, if exists)
-       - ./CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
-       - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
-       </files_to_read>
+<files_to_read>
+Read these files at execution start using the Read tool:
+- {phase_dir}/{plan_file} (Plan)
+- .planning/STATE.md (State)
+- .planning/config.json (Config, if exists)
+- ./CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
+- .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
+</files_to_read>
 
-       <success_criteria>
-       - [ ] All tasks executed
-       - [ ] Each task committed individually
-       - [ ] SUMMARY.md created in plan directory
-       - [ ] STATE.md updated with position and decisions
-       - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
-       </success_criteria>
-     "
-   )
+<success_criteria>
+- [ ] All tasks executed
+- [ ] Each task committed individually
+- [ ] SUMMARY.md created in plan directory
+- [ ] STATE.md updated with position and decisions
+- [ ] ROADMAP.md updated with plan progress (via \`roadmap update-plan-progress\`)
+</success_criteria>"
+     echo "$PROMPT_CONTENT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+   else
+     Task(
+       subagent_type="gsd-executor",
+       model="{executor_model}",
+       prompt="
+         <objective>
+         Execute plan {plan_number} of phase {phase_number}-{phase_name}.
+         Commit each task atomically. Create SUMMARY.md. Update STATE.md and ROADMAP.md.
+         </objective>
+
+         <execution_context>
+         @~/.claude/get-shit-done/workflows/execute-plan.md
+         @~/.claude/get-shit-done/templates/summary.md
+         @~/.claude/get-shit-done/references/checkpoints.md
+         @~/.claude/get-shit-done/references/tdd.md
+         </execution_context>
+
+         <files_to_read>
+         Read these files at execution start using the Read tool:
+         - {phase_dir}/{plan_file} (Plan)
+         - .planning/STATE.md (State)
+         - .planning/config.json (Config, if exists)
+         - ./CLAUDE.md (Project instructions, if exists — follow project-specific guidelines and coding conventions)
+         - .claude/skills/ or .agents/skills/ (Project skills, if either exists — list skills, read SKILL.md for each, follow relevant rules during implementation)
+         </files_to_read>
+
+         <success_criteria>
+         - [ ] All tasks executed
+         - [ ] Each task committed individually
+         - [ ] SUMMARY.md created in plan directory
+         - [ ] STATE.md updated with position and decisions
+         - [ ] ROADMAP.md updated with plan progress (via `roadmap update-plan-progress`)
+         </success_criteria>
+       "
+     )
+   fi
    ```
 
 3. **Wait for all agents in wave to complete.**
@@ -304,18 +337,30 @@ node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" commit "docs(phase-${PARENT
 <step name="verify_phase_goal">
 Verify phase achieved its GOAL, not just completed tasks.
 
-```
-Task(
-  prompt="Verify phase {phase_number} goal achievement.
+```bash
+if [[ "{verifier_model}" == ollama:* ]]; then
+  OLLAMA_MODEL_NAME="${verifier_model#ollama:}"
+  PROMPT_CONTENT="Verify phase {phase_number} goal achievement.
+Phase directory: {phase_dir}
+Phase goal: {goal from ROADMAP.md}
+Phase requirement IDs: {phase_req_ids}
+Check must_haves against actual codebase.
+Cross-reference requirement IDs from PLAN frontmatter against REQUIREMENTS.md — every ID MUST be accounted for.
+Create VERIFICATION.md."
+  echo "$PROMPT_CONTENT" | node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama run "$OLLAMA_MODEL_NAME"
+else
+  Task(
+    prompt="Verify phase {phase_number} goal achievement.
 Phase directory: {phase_dir}
 Phase goal: {goal from ROADMAP.md}
 Phase requirement IDs: {phase_req_ids}
 Check must_haves against actual codebase.
 Cross-reference requirement IDs from PLAN frontmatter against REQUIREMENTS.md — every ID MUST be accounted for.
 Create VERIFICATION.md.",
-  subagent_type="gsd-verifier",
-  model="{verifier_model}"
-)
+    subagent_type="gsd-verifier",
+    model="{verifier_model}"
+  )
+fi
 ```
 
 Read status:
