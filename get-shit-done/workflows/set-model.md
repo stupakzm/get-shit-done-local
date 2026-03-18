@@ -173,10 +173,12 @@ Which role to configure?
   0.  Exit
 ```
 
-Then call:
+Output the prompt line as plain text and wait for the user's next chat message:
 ```
-AskUserQuestion(question="Enter number (0–12):")
+Enter number (0–12):
 ```
+
+Do NOT call AskUserQuestion here. Just print the prompt and wait. The user's reply in chat is their selection.
 
 If user enters 0 or "exit" → break loop.
 
@@ -228,10 +230,12 @@ Select model for Executor:
   0. Back to profile default (currently: sonnet)
 ```
 
-Then call:
+Output the prompt line as plain text and wait for the user's next chat message:
 ```
-AskUserQuestion(question="Enter number:")
+Enter number:
 ```
+
+Do NOT call AskUserQuestion here. Just print the prompt and wait. The user's reply in chat is their selection.
 
 **3c. Determine value to write**
 
@@ -278,16 +282,15 @@ Verifier: ollama:llama3.2:3b → profile default
 
 **3f. Continue prompt**
 
-Print as plain text:
+Print as plain text and wait for the user's next chat message:
 ```
   1. Assign another role
   0. Done / Exit
+
+Enter number:
 ```
 
-Then call:
-```
-AskUserQuestion(question="Enter 1 to continue or 0 to exit:")
-```
+Do NOT call AskUserQuestion here. Just print and wait.
 
 If user enters 1 → go back to step 3a (skip hardware detection, keep existing hwInfo).
 If user enters 0 or "done" or "exit" → break loop.
