@@ -4,7 +4,7 @@
 
 **English** · [简体中文](README.zh-CN.md)
 
-**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, and Codex.**
+**A light-weight and powerful meta-prompting, context engineering and spec-driven development system for Claude Code, OpenCode, Gemini CLI, Codex, Copilot, and Antigravity.**
 
 **Solves context rot — the quality degradation that happens as Claude fills its context window.**
 
@@ -82,7 +82,7 @@ npx get-shit-done-cc@latest
 ```
 
 The installer prompts you to choose:
-1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, Copilot, or all
+1. **Runtime** — Claude Code, OpenCode, Gemini, Codex, Copilot, Antigravity, or all
 2. **Location** — Global (all projects) or local (current project only)
 
 Verify with:
@@ -90,6 +90,7 @@ Verify with:
 - OpenCode: `/gsd-help`
 - Codex: `$gsd-help`
 - Copilot: `/gsd:help`
+- Antigravity: `/gsd:help`
 
 > [!NOTE]
 > Codex installation uses skills (`skills/gsd-*/SKILL.md`) rather than custom prompts.
@@ -124,12 +125,16 @@ npx get-shit-done-cc --codex --local     # Install to ./.codex/
 npx get-shit-done-cc --copilot --global  # Install to ~/.github/
 npx get-shit-done-cc --copilot --local   # Install to ./.github/
 
+# Antigravity (Google, skills-first, Gemini-based)
+npx get-shit-done-cc --antigravity --global # Install to ~/.gemini/antigravity/
+npx get-shit-done-cc --antigravity --local  # Install to ./.agent/
+
 # All runtimes
 npx get-shit-done-cc --all --global      # Install to all directories
 ```
 
 Use `--global` (`-g`) or `--local` (`-l`) to skip the location prompt.
-Use `--claude`, `--opencode`, `--gemini`, `--codex`, `--copilot`, or `--all` to skip the runtime prompt.
+Use `--claude`, `--opencode`, `--gemini`, `--codex`, `--copilot`, `--antigravity`, or `--all` to skip the runtime prompt.
 
 </details>
 
@@ -337,19 +342,26 @@ If everything passes, you move on. If something's broken, you don't manually deb
 
 ---
 
-### 6. Repeat → Complete → Next Milestone
+### 6. Repeat → Ship → Complete → Next Milestone
 
 ```
 /gsd:discuss-phase 2
 /gsd:plan-phase 2
 /gsd:execute-phase 2
 /gsd:verify-work 2
+/gsd:ship 2                  # Create PR from verified work
 ...
 /gsd:complete-milestone
 /gsd:new-milestone
 ```
 
-Loop **discuss → plan → execute → verify** until milestone complete.
+Or let GSD figure out the next step automatically:
+
+```
+/gsd:next                    # Auto-detect and run next step
+```
+
+Loop **discuss → plan → execute → verify → ship** until milestone complete.
 
 If you want faster intake during discussion, use `/gsd:discuss-phase <n> --batch` to answer a small grouped set of questions at once instead of one-by-one.
 
@@ -486,6 +498,8 @@ You're never locked in. The system adapts.
 | `/gsd:plan-phase [N] [--auto]` | Research + plan + verify for a phase |
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves, verify when complete |
 | `/gsd:verify-work [N]` | Manual user acceptance testing ¹ |
+| `/gsd:ship [N] [--draft]` | Create PR from verified phase work with auto-generated body |
+| `/gsd:next` | Automatically advance to the next logical workflow step |
 | `/gsd:audit-milestone` | Verify milestone achieved its definition of done |
 | `/gsd:complete-milestone` | Archive milestone, tag release |
 | `/gsd:new-milestone [name]` | Start next version: questions → research → requirements → roadmap |
@@ -502,6 +516,7 @@ You're never locked in. The system adapts.
 | Command | What it does |
 |---------|--------------|
 | `/gsd:progress` | Where am I? What's next? |
+| `/gsd:next` | Auto-detect state and run the next step |
 | `/gsd:help` | Show all commands and usage guide |
 | `/gsd:update` | Update GSD with changelog preview |
 | `/gsd:join-discord` | Join the GSD Discord community |
@@ -526,8 +541,9 @@ You're never locked in. The system adapts.
 
 | Command | What it does |
 |---------|--------------|
-| `/gsd:pause-work` | Create handoff when stopping mid-phase |
+| `/gsd:pause-work` | Create handoff when stopping mid-phase (writes HANDOFF.json) |
 | `/gsd:resume-work` | Restore from last session |
+| `/gsd:session-report` | Generate session summary with work performed and outcomes |
 
 ### Utilities
 
@@ -538,9 +554,12 @@ You're never locked in. The system adapts.
 | `/gsd:add-todo [desc]` | Capture idea for later |
 | `/gsd:check-todos` | List pending todos |
 | `/gsd:debug [desc]` | Systematic debugging with persistent state |
+| `/gsd:do <text>` | Route freeform text to the right GSD command automatically |
+| `/gsd:note <text>` | Zero-friction idea capture — append, list, or promote notes to todos |
 | `/gsd:quick [--full] [--discuss] [--research]` | Execute ad-hoc task with GSD guarantees (`--full` adds plan-checking and verification, `--discuss` gathers context first, `--research` investigates approaches before planning) |
 | `/gsd:health [--repair]` | Validate `.planning/` directory integrity, auto-repair with `--repair` |
 | `/gsd:stats` | Display project statistics — phases, plans, requirements, git metrics |
+| `/gsd:profile-user [--questionnaire] [--refresh]` | Generate developer behavioral profile from session analysis for personalized responses |
 
 <sup>¹ Contributed by reddit user OracleGreyBeard</sup>
 
@@ -573,7 +592,7 @@ Switch profiles:
 /gsd:set-profile budget
 ```
 
-Use `inherit` to follow the current runtime model selection (for example OpenCode `/model`).
+Use `inherit` when using non-Anthropic providers (OpenRouter, local models) or to follow the current runtime model selection (e.g. OpenCode `/model`).
 
 Or configure via `/gsd:settings`.
 
@@ -598,6 +617,7 @@ Use `/gsd:settings` to toggle these, or override per-invocation:
 |---------|---------|------------------|
 | `parallelization.enabled` | `true` | Run independent plans simultaneously |
 | `planning.commit_docs` | `true` | Track `.planning/` in git |
+| `hooks.context_warnings` | `true` | Show context window usage warnings |
 
 ### Git Branching
 
@@ -681,14 +701,17 @@ To remove GSD completely:
 # Global installs
 npx get-shit-done-cc --claude --global --uninstall
 npx get-shit-done-cc --opencode --global --uninstall
+npx get-shit-done-cc --gemini --global --uninstall
 npx get-shit-done-cc --codex --global --uninstall
 npx get-shit-done-cc --copilot --global --uninstall
+npx get-shit-done-cc --antigravity --global --uninstall
 
 # Local installs (current project)
 npx get-shit-done-cc --claude --local --uninstall
 npx get-shit-done-cc --opencode --local --uninstall
 npx get-shit-done-cc --codex --local --uninstall
 npx get-shit-done-cc --copilot --local --uninstall
+npx get-shit-done-cc --antigravity --local --uninstall
 ```
 
 This removes all GSD commands, agents, hooks, and settings while preserving your other configurations.

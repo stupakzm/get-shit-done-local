@@ -116,6 +116,20 @@ Execute all plans in a phase.
 
 Usage: `/gsd:execute-phase 5`
 
+### Smart Router
+
+**`/gsd:do <description>`**
+Route freeform text to the right GSD command automatically.
+
+- Analyzes natural language input to find the best matching GSD command
+- Acts as a dispatcher — never does the work itself
+- Resolves ambiguity by asking you to pick between top matches
+- Use when you know what you want but don't know which `/gsd:*` command to run
+
+Usage: `/gsd:do fix the login button`
+Usage: `/gsd:do refactor the auth system`
+Usage: `/gsd:do I want to start a new milestone`
+
 ### Quick Mode
 
 **`/gsd:quick [--full] [--discuss] [--research]`**
@@ -241,6 +255,21 @@ Systematic debugging with persistent state across context resets.
 Usage: `/gsd:debug "login button doesn't work"`
 Usage: `/gsd:debug` (resume active session)
 
+### Quick Notes
+
+**`/gsd:note <text>`**
+Zero-friction idea capture — one command, instant save, no questions.
+
+- Saves timestamped note to `.planning/notes/` (or `~/.claude/notes/` globally)
+- Three subcommands: append (default), list, promote
+- Promote converts a note into a structured todo
+- Works without a project (falls back to global scope)
+
+Usage: `/gsd:note refactor the hook system`
+Usage: `/gsd:note list`
+Usage: `/gsd:note promote 3`
+Usage: `/gsd:note --global cross-project idea`
+
 ### Todo Management
 
 **`/gsd:add-todo [description]`**
@@ -278,6 +307,20 @@ Validate built features through conversational UAT.
 - Ready for re-execution if issues found
 
 Usage: `/gsd:verify-work 3`
+
+### Ship Work
+
+**`/gsd:ship [phase]`**
+Create a PR from completed phase work with an auto-generated body.
+
+- Pushes branch to remote
+- Creates PR with summary from SUMMARY.md, VERIFICATION.md, REQUIREMENTS.md
+- Optionally requests code review
+- Updates STATE.md with shipping status
+
+Prerequisites: Phase verified, `gh` CLI installed and authenticated.
+
+Usage: `/gsd:ship 4` or `/gsd:ship 4 --draft`
 
 ### Milestone Auditing
 
