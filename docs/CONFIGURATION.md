@@ -29,7 +29,12 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd:new
     "ui_phase": true,
     "ui_safety_gate": true,
     "node_repair": true,
-    "node_repair_budget": 2
+    "node_repair_budget": 2,
+    "research_before_questions": false
+  },
+  "hooks": {
+    "context_warnings": true,
+    "workflow_guard": false
   },
   "parallelization": {
     "enabled": true,
@@ -42,7 +47,8 @@ GSD stores project settings in `.planning/config.json`. Created during `/gsd:new
   "git": {
     "branching_strategy": "none",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
-    "milestone_branch_template": "gsd/{milestone}-{slug}"
+    "milestone_branch_template": "gsd/{milestone}-{slug}",
+    "quick_branch_template": null
   },
   "gates": {
     "confirm_project": true,
@@ -90,6 +96,7 @@ All workflow toggles follow the **absent = enabled** pattern. If a key is missin
 | `workflow.ui_safety_gate` | boolean | `true` | Prompt to run /gsd:ui-phase for frontend phases during plan-phase |
 | `workflow.node_repair` | boolean | `true` | Autonomous task repair on verification failure |
 | `workflow.node_repair_budget` | number | `2` | Max repair attempts per failed task |
+| `workflow.research_before_questions` | boolean | `false` | Run research before discussion questions instead of after |
 
 ### Recommended Presets
 
@@ -112,6 +119,17 @@ All workflow toggles follow the **absent = enabled** pattern. If a key is missin
 
 If `.planning/` is in `.gitignore`, `commit_docs` is automatically `false` regardless of config.json. This prevents git errors.
 
+---
+
+## Hook Settings
+
+| Setting | Type | Default | Description |
+|---------|------|---------|-------------|
+| `hooks.context_warnings` | boolean | `true` | Show context window usage warnings via context monitor hook |
+| `hooks.workflow_guard` | boolean | `false` | Warn when file edits happen outside GSD workflow context (advises using `/gsd:quick` or `/gsd:fast`) |
+
+The prompt injection guard hook (`gsd-prompt-guard.js`) is always active and cannot be disabled — it's a security feature, not a workflow toggle.
+
 ### Private Planning Setup
 
 To keep planning artifacts out of git:
@@ -133,6 +151,8 @@ To keep planning artifacts out of git:
 | `parallelization.max_concurrent_agents` | number | `3` | Maximum simultaneous agents |
 | `parallelization.min_plans_for_parallel` | number | `2` | Minimum plans to trigger parallel execution |
 
+> **Pre-commit hooks and parallel execution**: When parallelization is enabled, executor agents commit with `--no-verify` to avoid build lock contention (e.g., cargo lock fights in Rust projects). The orchestrator validates hooks once after each wave completes. STATE.md writes are protected by file-level locking to prevent concurrent write corruption. If you need hooks to run per-commit, set `parallelization.enabled: false`.
+
 ---
 
 ## Git Branching
@@ -142,6 +162,7 @@ To keep planning artifacts out of git:
 | `git.branching_strategy` | enum | `none` | `none`, `phase`, or `milestone` |
 | `git.phase_branch_template` | string | `gsd/phase-{phase}-{slug}` | Branch name template for phase strategy |
 | `git.milestone_branch_template` | string | `gsd/{milestone}-{slug}` | Branch name template for milestone strategy |
+| `git.quick_branch_template` | string or null | `null` | Optional branch name template for `/gsd:quick` tasks |
 
 ### Strategy Comparison
 
@@ -158,6 +179,15 @@ To keep planning artifacts out of git:
 | `{phase}` | `phase_branch_template` | `03` (zero-padded) |
 | `{slug}` | Both templates | `user-authentication` (lowercase, hyphenated) |
 | `{milestone}` | `milestone_branch_template` | `v1.0` |
+| `{num}` / `{quick}` | `quick_branch_template` | `260317-abc` (quick task ID) |
+
+Example quick-task branching:
+
+```json
+"git": {
+  "quick_branch_template": "gsd/quick-{num}-{slug}"
+}
+```
 
 ### Merge Options at Milestone Completion
 

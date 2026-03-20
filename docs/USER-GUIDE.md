@@ -8,6 +8,8 @@ A detailed reference for workflows, troubleshooting, and configuration. For quic
 
 - [Workflow Diagrams](#workflow-diagrams)
 - [UI Design Contract](#ui-design-contract)
+- [Backlog & Threads](#backlog--threads)
+- [Security](#security)
 - [Command Reference](#command-reference)
 - [Configuration Reference](#configuration-reference)
 - [Usage Examples](#usage-examples)
@@ -237,6 +239,72 @@ Controlled by `workflow.ui_safety_gate` config toggle.
 
 ---
 
+## Backlog & Threads
+
+### Backlog Parking Lot
+
+Ideas that aren't ready for active planning go into the backlog using 999.x numbering, keeping them outside the active phase sequence.
+
+```
+/gsd:add-backlog "GraphQL API layer"     # Creates 999.1-graphql-api-layer/
+/gsd:add-backlog "Mobile responsive"     # Creates 999.2-mobile-responsive/
+```
+
+Backlog items get full phase directories, so you can use `/gsd:discuss-phase 999.1` to explore an idea further or `/gsd:plan-phase 999.1` when it's ready.
+
+**Review and promote** with `/gsd:review-backlog` — it shows all backlog items and lets you promote (move to active sequence), keep (leave in backlog), or remove (delete).
+
+### Seeds
+
+Seeds are forward-looking ideas with trigger conditions. Unlike backlog items, seeds surface automatically when the right milestone arrives.
+
+```
+/gsd:plant-seed "Add real-time collab when WebSocket infra is in place"
+```
+
+Seeds preserve the full WHY and WHEN to surface. `/gsd:new-milestone` scans all seeds and presents matches.
+
+**Storage:** `.planning/seeds/SEED-NNN-slug.md`
+
+### Persistent Context Threads
+
+Threads are lightweight cross-session knowledge stores for work that spans multiple sessions but doesn't belong to any specific phase.
+
+```
+/gsd:thread                              # List all threads
+/gsd:thread fix-deploy-key-auth          # Resume existing thread
+/gsd:thread "Investigate TCP timeout"    # Create new thread
+```
+
+Threads are lighter weight than `/gsd:pause-work` — no phase state, no plan context. Each thread file includes Goal, Context, References, and Next Steps sections.
+
+Threads can be promoted to phases (`/gsd:add-phase`) or backlog items (`/gsd:add-backlog`) when they mature.
+
+**Storage:** `.planning/threads/{slug}.md`
+
+---
+
+## Security
+
+### Defense-in-Depth (v1.27)
+
+GSD generates markdown files that become LLM system prompts. This means any user-controlled text flowing into planning artifacts is a potential indirect prompt injection vector. v1.27 introduced centralized security hardening:
+
+**Path Traversal Prevention:**
+All user-supplied file paths (`--text-file`, `--prd`) are validated to resolve within the project directory. macOS `/var` → `/private/var` symlink resolution is handled.
+
+**Prompt Injection Detection:**
+The `security.cjs` module scans for known injection patterns (role overrides, instruction bypasses, system tag injections) in user-supplied text before it enters planning artifacts.
+
+**Runtime Hooks:**
+- `gsd-prompt-guard.js` — Scans Write/Edit calls to `.planning/` for injection patterns (always active, advisory-only)
+- `gsd-workflow-guard.js` — Warns on file edits outside GSD workflow context (opt-in via `hooks.workflow_guard`)
+
+**CI Scanner:**
+`prompt-injection-scan.test.cjs` scans all agent, workflow, and command files for embedded injection vectors. Run as part of the test suite.
+
+---
+
 ### Execution Wave Coordination
 
 ```
@@ -289,6 +357,7 @@ Controlled by `workflow.ui_safety_gate` config toggle.
 | `/gsd:execute-phase <N>` | Execute all plans in parallel waves | After planning is complete |
 | `/gsd:verify-work [N]` | Manual UAT with auto-diagnosis | After execution completes |
 | `/gsd:ship [N]` | Create PR from verified work | After verification passes |
+| `/gsd:fast <text>` | Inline trivial tasks — skips planning entirely | Typo fixes, config changes, small refactors |
 | `/gsd:next` | Auto-detect state and run next step | Anytime — "what should I do next?" |
 | `/gsd:ui-review [N]` | Retroactive 6-pillar visual audit | After execution or verify-work (frontend projects) |
 | `/gsd:audit-milestone` | Verify milestone met its definition of done | Before completing milestone |
@@ -331,6 +400,23 @@ Controlled by `workflow.ui_safety_gate` config toggle.
 | `/gsd:set-profile <profile>` | Quick profile switch | Change cost/quality tradeoff |
 | `/gsd:reapply-patches` | Restore local modifications after update | After `/gsd:update` if you had local edits |
 
+### Code Quality & Review
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/gsd:review --phase N` | Cross-AI peer review from external CLIs | Before executing, to validate plans |
+| `/gsd:pr-branch` | Clean PR branch filtering `.planning/` commits | Before creating PR with planning-free diff |
+| `/gsd:audit-uat` | Audit verification debt across all phases | Before milestone completion |
+
+### Backlog & Threads
+
+| Command | Purpose | When to Use |
+|---------|---------|-------------|
+| `/gsd:add-backlog <desc>` | Add idea to backlog parking lot (999.x) | Ideas not ready for active planning |
+| `/gsd:review-backlog` | Promote/keep/remove backlog items | Before new milestone, to prioritize |
+| `/gsd:plant-seed <idea>` | Forward-looking idea with trigger conditions | Ideas that should surface at a future milestone |
+| `/gsd:thread [name]` | Persistent context threads | Cross-session work outside the phase structure |
+
 ---
 
 ## Configuration Reference
@@ -354,12 +440,18 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
     "verifier": true,
     "nyquist_validation": true,
     "ui_phase": true,
-    "ui_safety_gate": true
+    "ui_safety_gate": true,
+    "research_before_questions": false
+  },
+  "hooks": {
+    "context_warnings": true,
+    "workflow_guard": false
   },
   "git": {
     "branching_strategy": "none",
     "phase_branch_template": "gsd/phase-{phase}-{slug}",
-    "milestone_branch_template": "gsd/{milestone}-{slug}"
+    "milestone_branch_template": "gsd/{milestone}-{slug}",
+    "quick_branch_template": null
   }
 }
 ```
@@ -391,8 +483,16 @@ GSD stores project settings in `.planning/config.json`. Configure during `/gsd:n
 | `workflow.nyquist_validation` | `true`, `false` | `true` | Validation architecture research during plan-phase; 8th plan-check dimension |
 | `workflow.ui_phase` | `true`, `false` | `true` | Generate UI design contracts for frontend phases |
 | `workflow.ui_safety_gate` | `true`, `false` | `true` | plan-phase prompts to run /gsd:ui-phase for frontend phases |
+| `workflow.research_before_questions` | `true`, `false` | `false` | Run research before discussion questions instead of after |
 
-Disable these to speed up phases in familiar domains or when conserving tokens.
+### Hook Settings
+
+| Setting | Options | Default | What it Controls |
+|---------|---------|---------|------------------|
+| `hooks.context_warnings` | `true`, `false` | `true` | Context window usage warnings |
+| `hooks.workflow_guard` | `true`, `false` | `false` | Warn on file edits outside GSD workflow context |
+
+Disable workflow toggles to speed up phases in familiar domains or when conserving tokens.
 
 ### Git Branching
 
@@ -401,6 +501,7 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 | `git.branching_strategy` | `none`, `phase`, `milestone` | `none` | When and how branches are created |
 | `git.phase_branch_template` | Template string | `gsd/phase-{phase}-{slug}` | Branch name for phase strategy |
 | `git.milestone_branch_template` | Template string | `gsd/{milestone}-{slug}` | Branch name for milestone strategy |
+| `git.quick_branch_template` | Template string or `null` | `null` | Optional branch name for `/gsd:quick` tasks |
 
 **Branching strategies explained:**
 
@@ -410,7 +511,15 @@ Disable these to speed up phases in familiar domains or when conserving tokens.
 | `phase` | At each `execute-phase` | One phase per branch | Code review per phase, granular rollback |
 | `milestone` | At first `execute-phase` | All phases share one branch | Release branches, PR per version |
 
-**Template variables:** `{phase}` = zero-padded number (e.g., "03"), `{slug}` = lowercase hyphenated name, `{milestone}` = version (e.g., "v1.0").
+**Template variables:** `{phase}` = zero-padded number (e.g., "03"), `{slug}` = lowercase hyphenated name, `{milestone}` = version (e.g., "v1.0"), `{num}` / `{quick}` = quick task ID (e.g., "260317-abc").
+
+Example quick-task branching:
+
+```json
+"git": {
+  "quick_branch_template": "gsd/quick-{num}-{slug}"
+}
+```
 
 ### Model Profiles (Per-Agent Breakdown)
 
@@ -564,6 +673,21 @@ Since v1.17, the installer backs up locally modified files to `gsd-local-patches
 
 A known workaround exists for a Claude Code classification bug. GSD's orchestrators (execute-phase, quick) spot-check actual output before reporting failure. If you see a failure message but commits were made, check `git log` -- the work may have succeeded.
 
+### Parallel Execution Causes Build Lock Errors
+
+If you see pre-commit hook failures, cargo lock contention, or 30+ minute execution times during parallel wave execution, this is caused by multiple agents triggering build tools simultaneously. GSD handles this automatically since v1.26 — parallel agents use `--no-verify` on commits and the orchestrator runs hooks once after each wave. If you're on an older version, add this to your project's `CLAUDE.md`:
+
+```markdown
+## Git Commit Rules for Agents
+All subagent/executor commits MUST use `--no-verify`.
+```
+
+To disable parallel execution entirely: `/gsd:settings` → set `parallelization.enabled` to `false`.
+
+### Windows: Installation Crashes on Protected Directories
+
+If the installer crashes with `EPERM: operation not permitted, scandir` on Windows, this is caused by OS-protected directories (e.g., Chromium browser profiles). Fixed since v1.24 — update to the latest version. As a workaround, temporarily rename the problematic directory before running the installer.
+
 ---
 
 ## Recovery Quick Reference
@@ -581,6 +705,7 @@ A known workaround exists for a Claude Code classification bug. GSD's orchestrat
 | Update broke local changes | `/gsd:reapply-patches` |
 | Want session summary for stakeholder | `/gsd:session-report` |
 | Don't know what step is next | `/gsd:next` |
+| Parallel execution build errors | Update GSD or set `parallelization.enabled: false` |
 
 ---
 
