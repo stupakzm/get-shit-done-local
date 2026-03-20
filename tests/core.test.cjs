@@ -18,6 +18,7 @@ const {
   escapeRegex,
   generateSlugInternal,
   normalizePhaseName,
+  reapStaleTempFiles,
   normalizeMd,
   comparePhaseNum,
   safeReadFile,
@@ -1341,5 +1342,53 @@ describe('findProjectRoot', () => {
     fs.mkdirSync(backendDir);
 
     assert.strictEqual(findProjectRoot(backendDir), backendDir);
+  });
+});
+
+// ─── reapStaleTempFiles ─────────────────────────────────────────────────────
+
+describe('reapStaleTempFiles', () => {
+  test('removes stale gsd-*.json files older than maxAgeMs', () => {
+    const tmpDir = os.tmpdir();
+    const stalePath = path.join(tmpDir, `gsd-reap-test-${Date.now()}.json`);
+    fs.writeFileSync(stalePath, '{}');
+    // Set mtime to 10 minutes ago
+    const oldTime = new Date(Date.now() - 10 * 60 * 1000);
+    fs.utimesSync(stalePath, oldTime, oldTime);
+
+    reapStaleTempFiles('gsd-reap-test-', { maxAgeMs: 5 * 60 * 1000 });
+
+    assert.ok(!fs.existsSync(stalePath), 'stale file should be removed');
+  });
+
+  test('preserves fresh gsd-*.json files', () => {
+    const tmpDir = os.tmpdir();
+    const freshPath = path.join(tmpDir, `gsd-reap-fresh-${Date.now()}.json`);
+    fs.writeFileSync(freshPath, '{}');
+
+    reapStaleTempFiles('gsd-reap-fresh-', { maxAgeMs: 5 * 60 * 1000 });
+
+    assert.ok(fs.existsSync(freshPath), 'fresh file should be preserved');
+    // Clean up
+    fs.unlinkSync(freshPath);
+  });
+
+  test('removes stale temp directories when present', () => {
+    const tmpDir = os.tmpdir();
+    const staleDir = fs.mkdtempSync(path.join(tmpDir, 'gsd-reap-dir-'));
+    fs.writeFileSync(path.join(staleDir, 'data.jsonl'), 'test');
+    // Set mtime to 10 minutes ago
+    const oldTime = new Date(Date.now() - 10 * 60 * 1000);
+    fs.utimesSync(staleDir, oldTime, oldTime);
+
+    reapStaleTempFiles('gsd-reap-dir-', { maxAgeMs: 5 * 60 * 1000 });
+
+    assert.ok(!fs.existsSync(staleDir), 'stale directory should be removed');
+  });
+
+  test('does not throw on empty or missing prefix matches', () => {
+    assert.doesNotThrow(() => {
+      reapStaleTempFiles('gsd-nonexistent-prefix-xyz-', { maxAgeMs: 0 });
+    });
   });
 });
