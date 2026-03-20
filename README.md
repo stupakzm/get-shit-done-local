@@ -774,6 +774,25 @@ These community ports pioneered multi-runtime support:
 
 ---
 
+## Using Local Models (Ollama)
+
+GSD supports assigning Ollama models to specific agent roles via `/gsd:set-model --assign`. However, local models have a fundamental limitation: they run as text-in/text-out processes and cannot access Claude Code's tool system (Read, Write, Edit, Bash). This means they cannot modify files or execute commands.
+
+**What local models can do usefully within GSD today:**
+
+| Role | Local model viable? | Why |
+|------|---------------------|-----|
+| Planner | Yes | Text output only — no tools needed |
+| Phase Researcher | Yes | Text output only |
+| Research Synthesizer | Yes | Text output only |
+| Codebase Mapper | Partial | Analysis is text; writing reports needs tools |
+| Executor | No | Needs Read/Write/Edit/Bash |
+| Verifier | No | Needs file reads and Bash |
+
+**Recommended approach:** assign local models to planner and researcher roles to reduce API cost, and keep Claude for any role that touches files. Use `/gsd:set-model --assign` to configure per-role assignments and `/gsd:set-profile` to switch between quality/balanced/budget presets.
+
+---
+
 ## Star History
 
 <a href="https://star-history.com/#glittercowboy/get-shit-done&Date">
