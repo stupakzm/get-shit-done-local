@@ -11,7 +11,7 @@ Read all files referenced by the invoking prompt's execution_context before star
 <process>
 
 <step name="load_context">
-Run both commands to gather current state:
+Run all three commands to gather current state:
 
 ```bash
 node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama list
@@ -32,6 +32,15 @@ cat .planning/config.json 2>/dev/null || echo "{}"
 Parse the JSON result. Extract:
 - `config.model_overrides` (default: `{}`)
 - `config.model_profile` (default: `"balanced"`)
+
+```bash
+cat "$HOME/.claude/get-shit-done/hw-cache.json" 2>/dev/null || echo "null"
+```
+
+Parse the result into `hwCached`. If the result is `null` or the file is missing, set `hwCached = null`.
+Valid cache shape: `{ "vram": { "available": bool, "mb": N, "gb": N, "source": str }, "ram": { "available": true, "bytes": N, "gb": N } }`
+
+Initialize `hwInfo = hwCached` (may be null — will be set or skipped during role_picker_loop).
 </step>
 
 <step name="show_view_table">
@@ -91,16 +100,63 @@ If Ollama was unavailable, append a note below the table:
 </step>
 
 <step name="check_view_only">
-If the workflow was invoked with no positional arguments AND no `--assign` flag, treat this as
-view-only mode: display the table and exit with the message:
+Check the arguments:
 
+- If `--detect-hw` was passed → skip to the `detect_hw_mode` step immediately.
+- If `--assign` was passed → continue to the `role_picker_loop` step.
+- If no arguments (or `--view`) → display the table and exit with the message:
+  ```
+  Run /gsd:set-model --assign to configure a role assignment.
+  Run /gsd:set-model --detect-hw to update cached hardware info.
+  ```
+  Skip the role_picker_loop entirely.
+</step>
+
+<step name="detect_hw_mode">
+This step handles the `--detect-hw` flag. It manages the hardware cache independently of the assignment flow.
+
+First display the current cached values:
+- If `hwCached` is not null:
+  ```
+  Current cached hardware:
+    RAM:  {hwCached.ram.gb} GB
+    VRAM: {hwCached.vram.gb} GB ({hwCached.vram.source})   ← if vram.available
+          or: VRAM: unavailable                              ← if !vram.available
+  ```
+- If `hwCached` is null:
+  ```
+  Current cached hardware: not set
+  ```
+
+Then call:
 ```
-Run /gsd:set-model --assign to configure a role assignment.
+AskUserQuestion(question="What would you like to do?", options=["Detect / update RAM & VRAM", "See current (shown above)", "Cancel"])
 ```
 
-Skip the role_picker_loop entirely.
+- **"Detect / update RAM & VRAM":**
+  Run:
+  ```bash
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
+  ```
+  Parse JSON into `hwInfo`. Display:
+  ```
+  Hardware detected:
+    RAM:  {hwInfo.ram.gb} GB
+    VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})   ← if vram.available
+          or: VRAM: unavailable                          ← if !vram.available
+  ```
+  Save to cache:
+  ```bash
+  node -e "const fs=require('fs'),os=require('os'),p=os.homedir()+'/.claude/get-shit-done/hw-cache.json'; fs.mkdirSync(require('path').dirname(p),{recursive:true}); fs.writeFileSync(p, JSON.stringify(<hwInfo_json>, null, 2));"
+  ```
+  (Replace `<hwInfo_json>` with the actual parsed JSON object serialized as a JS literal.)
+  Display: `Hardware cache updated.`
 
-If `--assign` was passed (or any role name was specified), continue to the role_picker_loop.
+- **"See current (shown above)":** No action — values already displayed above. Display: `No changes made.`
+
+- **"Cancel":** Display: `Cancelled.`
+
+Exit after this step (do not enter role_picker_loop).
 </step>
 
 <step name="role_picker_loop">
@@ -111,49 +167,54 @@ Initialize `hwInfo = null` (will be set by hardware detection below).
 
 ---
 
-**QUESTION 0 — Hardware Detection (MUST ask this FIRST, before role selection)**
+**QUESTION 0 — Hardware Info**
 
-Ask this question immediately when entering the loop. Do NOT skip it. Do NOT proceed to role
-selection without asking it first.
+Check `hwInfo` (loaded from cache in load_context):
 
-Print as plain text:
-```
-Hardware detection — detect VRAM/RAM so the model picker can show which local models fit?
+- **If `hwInfo` is not null (cache hit):** Show the cached values and skip asking — do NOT prompt the user:
+  ```
+  Hardware (cached):
+    RAM:  {hwInfo.ram.gb} GB
+    VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})   ← if vram.available
+          or: VRAM: unavailable                          ← if !vram.available
+  ```
+  Proceed directly to role selection. Do NOT ask if they want to detect.
 
-  1. Yes
-  2. No / Skip
-```
+- **If `hwInfo` is null (no cache):** Ask once:
+  ```
+  AskUserQuestion(question="No hardware cache found — detect RAM/VRAM so the model picker can show which local models fit?", options=["Yes, detect now", "No / Skip"])
+  ```
+  If user selects "Yes, detect now":
+  ```bash
+  node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
+  ```
+  Parse the JSON output into `hwInfo`:
+  ```json
+  { "vram": { "available": true/false, "mb": N, "gb": N, "source": "nvidia-smi" },
+    "ram":  { "available": true, "bytes": N, "gb": N } }
+  ```
+  Display:
+  ```
+  Hardware detected:
+    RAM:  {hwInfo.ram.gb} GB
+    VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})
+  ```
+  If vram.available is false: show `VRAM: unavailable`.
+  If command fails: set `hwInfo = null`, show `Hardware detection failed — no labels will be shown`.
 
-Then call (no options array — user types a number or word):
-```
-AskUserQuestion(question="Enter 1 or 2 (or yes/no):")
-```
+  Save to cache immediately after successful detection:
+  ```bash
+  node -e "const fs=require('fs'),os=require('os'),p=os.homedir()+'/.claude/get-shit-done/hw-cache.json'; fs.mkdirSync(require('path').dirname(p),{recursive:true}); fs.writeFileSync(p, JSON.stringify(<hwInfo_json>, null, 2));"
+  ```
+  (Replace `<hwInfo_json>` with the actual parsed JSON object.)
 
-If user enters 1 or "yes":
-```bash
-node "$HOME/.claude/get-shit-done/bin/gsd-tools.cjs" ollama hw-detect
-```
-Parse the JSON output into `hwInfo`:
-```json
-{ "vram": { "available": true/false, "mb": N, "gb": N, "source": "nvidia-smi" },
-  "ram":  { "available": true, "bytes": N, "gb": N } }
-```
-Display:
-```
-Hardware detected:
-  RAM:  {hwInfo.ram.gb} GB
-  VRAM: {hwInfo.vram.gb} GB ({hwInfo.vram.source})
-```
-If vram.available is false: show `VRAM: unavailable`.
-If command fails: set `hwInfo = null`, show `Hardware detection failed — no labels will be shown`.
-
-If user enters 2 or "no" or "skip": `hwInfo` stays null.
+  If user selects "No / Skip": `hwInfo` stays null.
 
 ---
 
 **3a. Role selection**
 
-Output this exact block as plain text (do NOT use AskUserQuestion for the list — just print it):
+Output this exact block as plain text. CRITICAL: copy the numbers exactly as written — do NOT renumber, do NOT auto-increment. Exit is 0, not 13.
 
 ```
 Which role to configure?
@@ -170,19 +231,28 @@ Which role to configure?
   10. Plan Checker
   11. Integration Checker
   12. Nyquist Auditor
-  0.  Exit
 ```
 
-Output the prompt line as plain text and wait for the user's next chat message:
+Output the prompt line and wait for the user's next chat message:
 ```
-Enter number (0–12):
+Enter number (1–12), 0 to exit:
 ```
-
-Do NOT call AskUserQuestion here. Just print the prompt and wait. The user's reply in chat is their selection.
 
 If user enters 0 or "exit" → break loop.
 
-Map the number to agentKey using ROLE_FRIENDLY_NAMES above (1=gsd-planner, 2=gsd-roadmapper, etc.).
+Map the number to agentKey:
+- 1 → gsd-planner
+- 2 → gsd-roadmapper
+- 3 → gsd-executor
+- 4 → gsd-phase-researcher
+- 5 → gsd-project-researcher
+- 6 → gsd-research-synthesizer
+- 7 → gsd-debugger
+- 8 → gsd-codebase-mapper
+- 9 → gsd-verifier
+- 10 → gsd-plan-checker
+- 11 → gsd-integration-checker
+- 12 → gsd-nyquist-auditor
 
 **3b. Model selection**
 
@@ -205,12 +275,13 @@ Where label:
   - **EXACT strings. WRONG: "light, fast", "mid", or any variation.**
 - Otherwise: no label
 
-After Ollama models append:
+After Ollama models append — use EXACT numbers as shown, no renumbering:
 ```
   {N+1}. sonnet
   {N+2}. haiku
   {N+3}. inherit
   {N+4}. Type custom model name
+  {N+5}. Exit / Cancel (back to role picker)
   0.    Back to profile default (currently: {profileDefault})
 ```
 
@@ -227,6 +298,7 @@ Select model for Executor:
   7. haiku
   8. inherit
   9. Type custom model name
+  10. Exit / Cancel (back to role picker)
   0. Back to profile default (currently: sonnet)
 ```
 
@@ -244,6 +316,7 @@ Do NOT call AskUserQuestion here. Just print the prompt and wait. The user's rep
 - User entered number for "Type custom model name":
   - Call: `AskUserQuestion(question="Enter model name (e.g. ollama:qwen2.5-coder:32b or sonnet):")`
   - value = typed string verbatim. No auto-prefix.
+- User entered number for "Exit / Cancel" → go back to step 3a immediately, no assignment written
 - User entered 0 → value = `reset`
 
 **3d. Write the assignment**
@@ -282,18 +355,13 @@ Verifier: ollama:llama3.2:3b → profile default
 
 **3f. Continue prompt**
 
-Print as plain text and wait for the user's next chat message:
+Call:
 ```
-  1. Assign another role
-  0. Done / Exit
-
-Enter number:
+AskUserQuestion(question="Assign another role?", options=["Assign another role", "Done / Exit"])
 ```
 
-Do NOT call AskUserQuestion here. Just print and wait.
-
-If user enters 1 → go back to step 3a (skip hardware detection, keep existing hwInfo).
-If user enters 0 or "done" or "exit" → break loop.
+If user selects "Assign another role" → go back to step 3a (skip hardware detection, keep existing hwInfo).
+If user selects "Done / Exit" → break loop.
 </step>
 
 <step name="done">
@@ -313,11 +381,14 @@ No changes made.
 <success_criteria>
 - [ ] Role-to-model table displayed before any picker
 - [ ] Role picker shows 12 friendly names + Exit option
-- [ ] Model picker shows Ollama models with sizes (if available) + cloud options + Reset
+- [ ] Model picker shows Ollama models with sizes (if available) + cloud options + Reset + Exit/Cancel
 - [ ] Assignment written via config-set-model-override
 - [ ] One-line diff displayed after each assignment
 - [ ] "Assign another role?" loop continues until user says No or picks Exit
 - [ ] Assignment persists in .planning/config.json as model_overrides entry
-- [ ] User is offered hardware detection option before the role picker loop
+- [ ] Hardware cache loaded at start; if cached, skip asking and show cached values
+- [ ] Hardware detection asked only when cache is missing; result saved to hw-cache.json
+- [ ] --detect-hw flag shows 3-option menu: detect/update, see current, cancel
+- [ ] Role picker uses AskUserQuestion options — Exit option works correctly
 - [ ] Ollama models in picker show feasibility labels when hwInfo.vram.available is true
 </success_criteria>
